@@ -29,7 +29,9 @@ import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.elasticsearch.core.query.Query;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
-
+@Transactional
 @Service
 public class UserActService {
     private final ElasticsearchOperations elasticsearchOperations;
@@ -54,14 +56,16 @@ public class UserActService {
         super();
         this.elasticsearchOperations = elasticsearchOperations;
     }
-    public List<UserActivity> findByMessageDate(final String message,String date,String pcName) {
-        QueryBuilder queryBuilderURL = boolQuery().must(matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
+    public List<UserActivity> findByField(final String message,String fromDate,String toDate,String pcName) {
+        //QueryBuilder queryBuilderURL = boolQuery().must(matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("@timestamp")
+                                                                    .gte(fromDate)
+                                                                    .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
         Query searchQuery = new NativeSearchQueryBuilder()
-                .withFilter(QueryBuilders.termQuery("@timestamp",date))
-
+                //.withFilter(QueryBuilders.termQuery("@timestamp",date))
                 //.withFilter(QueryBuilders.termQuery("url",message))
                 //.withQuery(matchPhraseQuery("user_id",pcName))
-                .withQuery(queryBuilderURL)
+                .withQuery(queryBuilder)
                 .withSort(SortBuilders.fieldSort("@timestamp").order(SortOrder.ASC))
                 .build();
         SearchHits<UserActivity> productHits =
@@ -119,7 +123,7 @@ public class UserActService {
     }
     //3mi=10800
     //10mi=36000get
-    public boolean mainProcessing(String dateNow) throws IOException {
+    public boolean mainProcessing(String fromDate,String toDate) throws IOException {
         try {
             String dateDB = "";
             String pcName="";
@@ -130,7 +134,7 @@ public class UserActService {
                     pcName = arr[1];
                 }
                 if (lstRoot.get(j).contains("CONNECT")) {
-                    List<UserActivity> lstUser = findByMessageDate(splitHeadTail(lstRoot.get(j)), dateNow,pcName);
+                    List<UserActivity> lstUser = findByField(splitHeadTail(lstRoot.get(j)), fromDate,toDate,pcName);
                     float totalTime = 0;
                     int flag = 0;
                     try {
@@ -146,22 +150,31 @@ public class UserActService {
                         float milliTimeS = getMilliTime(timeRootS);
                         float timeUsed = milliTimeS - milliTimeF;
                         //time between two surf bigger than 3 minutes--->solve // break time =3m
-                        if (timeUsed > 180) {
+                        if (timeUsed >= 180) {
                             if(totalTime==0)
-                                totalTime=timeUsed;
+                                totalTime=180;
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
                             flag = 1;
                         } else
                             totalTime += timeUsed;
-                        if (totalTime > 600) {
+                        if (totalTime >= 600) {
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
                             flag = 1;
                         }
+                        if(i==lstUser.size()-2){
+                            if(timeUsed>180)
+                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), 180, dateDB, pcName);
+                            else
+                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), timeUsed, dateDB, pcName);
+                            flag=1;
+                        }
                     }
                     if (flag == 0) {
                         try {
+                            if(lstUser.size()==1)
+                                totalTime=180;
                             processAdd(splitHeadTail(lstUser.get(0).getUrl()), totalTime, dateDB, pcName);
                         } catch (Exception e) {
                         }
@@ -176,6 +189,7 @@ public class UserActService {
     public void processAdd(String message,float totalTime,String date, String pcName){
         int count=getCount(pcName,message,date);
         float total = getTotalTime(pcName,message,date);
+        total = total*60;
         totalTime+=total;
         UserActivityDB userActivityDB = new UserActivityDB(pcName,message,++count,date,(totalTime/60));
         userActDBRepository.save(userActivityDB);
@@ -235,5 +249,11 @@ public class UserActService {
         }
         userActDBRepository.saveAll(lstDBInfo);
         return true;
+    }
+    public List<UserActivity> findAll(){
+        return (List<UserActivity>) userActRepository.findAll();
+    }
+    public List<UserActivity> findByUrl(String url){
+        return userActRepository.findByUrl(url);
     }
 }

@@ -4,6 +4,7 @@ import com.example.elastic.model.UserActivity;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.service.UserActService;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,27 +19,27 @@ public class UserActController {
     @Autowired
     private UserActDBRepository userActDBRepository;
     @GetMapping("/find-all")
-    public Iterable<UserActivity> findAllUsers() {
-        return userActRepository.findAll();
-    }
-    @GetMapping("/pull-into-db")
-    public boolean pullDataIntoDB(@RequestBody String dateNow) throws IOException {
-        return userActService.mainProcessing(dateNow);
+    public List<UserActivity> findAllUsers() {
+        return userActService.findAll();
     }
     @GetMapping("/find-by-url")
-    public Iterable<UserActivity> findByUrl(@RequestBody String url) {
-        return userActRepository.findByUrl(url);
+    public List<UserActivity> findByUrl(@RequestBody String url) {
+        return userActService.findByUrl(url);
     }
     @GetMapping("/group-by-field")
     public List<String> groupByField() throws IOException {
         return userActService.groupByField();
     }
-    @GetMapping("find-by-message-date")
+    @GetMapping("find-by-field")
     public List<UserActivity> solve2(@RequestBody String message) {
-        return userActService.findByMessageDate(userActService.splitHeadTail(message),"2021-03-19","PC-LenHo");
+        return userActService.findByField(userActService.splitHeadTail(message),"2021-03-19","2021-03-19","PC-LenHo");
     }
     @PostMapping("/saveAll")
     public boolean saveAll() {
         return userActService.saveAll();
+    }
+    @GetMapping("/pull-into-db")
+    public boolean pullDataIntoDB(@RequestBody ObjectNode objectNode) throws IOException {
+        return userActService.mainProcessing(objectNode.get("str1").asText(),objectNode.get("str2").asText());
     }
 }
