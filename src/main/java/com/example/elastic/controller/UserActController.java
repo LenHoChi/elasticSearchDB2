@@ -3,8 +3,8 @@ package com.example.elastic.controller;
 import com.example.elastic.model.UserActivity;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
+import com.example.elastic.service.PlayGround;
 import com.example.elastic.service.UserActService;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.util.*;
 @RestController
 public class UserActController {
+    @Autowired
+    PlayGround playground;
     @Autowired
     private UserActService userActService;
     @Autowired
@@ -38,8 +40,8 @@ public class UserActController {
     public boolean saveAll() {
         return userActService.saveAll();
     }
-    @GetMapping("/pull-into-db")
-    public boolean pullDataIntoDB(@RequestBody ObjectNode objectNode) throws IOException {
-        return userActService.mainProcessing(objectNode.get("str1").asText(),objectNode.get("str2").asText());
+    @GetMapping("/len")
+    public void callFunction(){
+        playground.startCron();
     }
 }

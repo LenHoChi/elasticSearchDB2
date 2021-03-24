@@ -55,8 +55,18 @@
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.github.tonyquang</groupId>
+			<artifactId>easy-quartz</artifactId>
+			<version>6a959f0a54</version>
+		</dependency>
 	</dependencies>
-
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 	<build>
 		<plugins>
 			<plugin>

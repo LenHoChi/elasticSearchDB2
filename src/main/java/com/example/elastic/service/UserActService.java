@@ -21,6 +21,9 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.ScoreSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.client.ClientConfiguration;
 import org.springframework.data.elasticsearch.client.RestClients;
@@ -34,19 +37,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
 @Transactional
 @Service
-public class UserActService {
+public class UserActService implements Job {
     private final ElasticsearchOperations elasticsearchOperations;
     private final String index="test3";
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
     @Autowired
     UserActRepository userActRepository;
     @Autowired
@@ -123,7 +129,26 @@ public class UserActService {
     }
     //3mi=10800
     //10mi=36000get
-    public boolean mainProcessing(String fromDate,String toDate) throws IOException {
+    public Boolean mainProcessing(String timeStamp) throws IOException {
+        int hour=0;
+        String date="";
+        String fromDate = "";
+        String toDate="";
+        try {
+            Date dateFire = sdf.parse(timeStamp);
+            hour = dateFire.getHours();
+            String[] temp = timeStamp.split(" ");
+            date=temp[0];
+            if(hour<12){
+                fromDate=date+"T08";
+                toDate=date+"T11:30";
+            }else{
+                fromDate=date+"T11:31";
+                toDate=date+"T15:30";
+            }
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
         try {
             String dateDB = "";
             String pcName="";
@@ -139,7 +164,6 @@ public class UserActService {
                     int flag = 0;
                     try {
                         dateDB = getDateFromEL(lstUser.get(0).getTime());
-                        //pcName = lstUser.get(0).getUser_id();
                     } catch (Exception e) {
                     }
                     for (int i = 0; i < lstUser.size() - 1; i++) {
@@ -186,6 +210,7 @@ public class UserActService {
         }
         return true;
     }
+
     public void processAdd(String message,float totalTime,String date, String pcName){
         int count=getCount(pcName,message,date);
         float total = getTotalTime(pcName,message,date);
@@ -255,5 +280,16 @@ public class UserActService {
     }
     public List<UserActivity> findByUrl(String url){
         return userActRepository.findByUrl(url);
+    }
+
+    @Override
+    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        Timestamp scheduledFireTime = new Timestamp(jobExecutionContext.getScheduledFireTime().getTime());
+        String strScheduledFireTime = sdf.format(scheduledFireTime);
+        try {
+            mainProcessing(strScheduledFireTime);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

@@ -7,7 +7,9 @@ import com.example.elastic.model.UserActivityDB;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.service.UserActService;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.WildcardQueryBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,12 +27,14 @@ import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.context.web.WebAppConfiguration;
+import static org.assertj.core.api.Assertions.*;
 
 import javax.persistence.Column;
 import javax.persistence.Id;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -50,7 +54,7 @@ public class UserActServiceTest {
     private UserActRepository userActRepository;
     @MockBean
     private UserActDBRepository userActDBRepository;
-    @MockBean
+    @Autowired
     private ElasticsearchOperations elasticsearchOperations;
     @Test
     public void testFindAll(){
@@ -169,11 +173,18 @@ public class UserActServiceTest {
 
         List<UserActivity> lstUser = Arrays.asList(userActivityA, userActivityB);
 
-        Query query = new NativeSearchQueryBuilder().build();
-        SearchHits<UserActivity> productHits = null;
-        //productHits.forEach();
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("user_id","PC-LenHo"));
+        QueryBuilder queryBuilder1 = QueryBuilders.boolQuery().must(new WildcardQueryBuilder("url","www.faceboo*.com"));
+        Query query = new NativeSearchQueryBuilder().withQuery(queryBuilder1).build();
+        SearchHits<UserActivity> productHits =
+                elasticsearchOperations
+                        .search(query, UserActivity.class,
+                                IndexCoordinates.of("test3"));
+        List<UserActivity> productMatches = new ArrayList<>();
+        productHits.forEach(srchHit-> productMatches.add(srchHit.getContent()));
 
-        when(elasticsearchOperations.search(query,UserActivity.class, IndexCoordinates.of("index"))).thenReturn(productHits);
-
+        //assertEquals(productMatches.size(),1271);
+        assertThat(productMatches.get(0).getUrl()).contains("facebook.com");
+        //when(elasticsearchOperations.search(query,UserActivity.class, IndexCoordinates.of("index"))).thenReturn(productHits);
     }
 }
