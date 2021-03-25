@@ -130,6 +130,7 @@ public class UserActService implements Job {
     //3mi=10800
     //10mi=36000get
     public Boolean mainProcessing(String timeStamp) throws IOException {
+        System.out.println(timeStamp);
         int hour=0;
         String date="";
         String fromDate = "";

@@ -8,7 +8,7 @@ import javax.persistence.*;
 
 @Entity
 @IdClass(MyKey.class)
-@Table(name = "user_activity3", schema = "public")
+@Table(name = "user_activity", schema = "public")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

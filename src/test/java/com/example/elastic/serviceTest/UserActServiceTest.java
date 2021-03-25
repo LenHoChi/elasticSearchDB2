@@ -10,8 +10,11 @@ import com.example.elastic.service.UserActService;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.WildcardQueryBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -21,6 +24,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.IndexQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.elasticsearch.core.query.Query;
@@ -168,23 +172,34 @@ public class UserActServiceTest {
         String fromDate = "2021-12-21T06";
         String toDate = "2021-12-21T07";
 
-        UserActivity userActivityA = new UserActivity("1","www.youtube.com","2021-04-23","PC-LenHo");
+        UserActivity userActivityA = new UserActivity("1","www.facebook.com","2021-04-23","PC-LenHo");
         UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-05-23","PC-LenHo");
 
-        List<UserActivity> lstUser = Arrays.asList(userActivityA, userActivityB);
-
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("user_id","PC-LenHo"));
-        QueryBuilder queryBuilder1 = QueryBuilders.boolQuery().must(new WildcardQueryBuilder("url","www.faceboo*.com"));
-        Query query = new NativeSearchQueryBuilder().withQuery(queryBuilder1).build();
-        SearchHits<UserActivity> productHits =
-                elasticsearchOperations
-                        .search(query, UserActivity.class,
-                                IndexCoordinates.of("test3"));
-        List<UserActivity> productMatches = new ArrayList<>();
-        productHits.forEach(srchHit-> productMatches.add(srchHit.getContent()));
-
-        //assertEquals(productMatches.size(),1271);
-        assertThat(productMatches.get(0).getUrl()).contains("facebook.com");
-        //when(elasticsearchOperations.search(query,UserActivity.class, IndexCoordinates.of("index"))).thenReturn(productHits);
+        List<IndexQuery> indexQueries = new ArrayList<>();
+        IndexQuery indexQuery1 = new IndexQuery();
+        indexQuery1.setId("so1");
+        indexQuery1.setObject(userActivityA);
+        IndexQuery indexQuery2 = new IndexQuery();
+        indexQuery2.setId("so2");
+        indexQuery2.setObject(userActivityB);
+        indexQueries.add(indexQuery1);
+        indexQueries.add(indexQuery2);
+        IndexCoordinates index = IndexCoordinates.of("len");
+        elasticsearchOperations.bulkIndex(indexQueries,index);
+        elasticsearchOperations.indexOps(UserActivity.class).refresh();
+//        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("@timestamp")
+//                .gte(fromDate)
+//                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",url));
+//        Query searchQuery = new NativeSearchQueryBuilder()
+//                .withQuery(queryBuilder)
+//                .withSort(SortBuilders.fieldSort("@timestamp").order(SortOrder.ASC))
+//                .build();
+        Query searchQuery = new NativeSearchQueryBuilder().withQuery(QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("url","www.facebook.com"))).build();
+        SearchHits<UserActivity> userActivitySearchHits = elasticsearchOperations.search(searchQuery,UserActivity.class,index);
+        assertThat(userActivitySearchHits).hasSize(2);
+    }
+    @Test
+    public void test(){
+        // given
     }
 }
