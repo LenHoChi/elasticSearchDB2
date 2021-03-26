@@ -1,6 +1,7 @@
 package com.example.elastic.controller;
 
 import com.example.elastic.model.UserActivity;
+import com.example.elastic.model.UserActivityDB;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.service.UserActService;
@@ -19,8 +20,12 @@ public class UserActController {
     @Autowired
     private UserActDBRepository userActDBRepository;
     @GetMapping("/find-all")
-    public List<UserActivity> findAllUsers() {
+    public Iterable<UserActivity> findAllUsers() {
         return userActService.findAll();
+    }
+    @GetMapping("/find-all-db")
+    public List<UserActivityDB> findAllUsersDB() {
+        return userActDBRepository.findAll();
     }
     @GetMapping("/find-by-url")
     public List<UserActivity> findByUrl(@RequestBody String url) {
@@ -31,12 +36,15 @@ public class UserActController {
         return userActService.groupByField();
     }
     @GetMapping("find-by-field")
-    public List<UserActivity> solve2(@RequestBody String message) {
+    public List<UserActivity> solve2(@RequestBody String message) throws IOException {
         return userActService.findByField(userActService.splitHeadTail(message),"2021-03-19","2021-03-19","PC-LenHo");
     }
     @PostMapping("/saveAll")
     public boolean saveAll() {
         return userActService.saveAll();
     }
-
+    @PostMapping("/pull-into-db")
+    public boolean pullDataIntoDB(@RequestBody String time) throws IOException {
+        return userActService.mainProcessing(time);
+    }
 }

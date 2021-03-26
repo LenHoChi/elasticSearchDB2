@@ -1,5 +1,6 @@
 package com.example.elastic.service;
 
+import com.example.elastic.configuration.DBConfig;
 import com.example.elastic.convert.ToDB;
 import com.example.elastic.model.MyKey;
 import com.example.elastic.model.UserActivity;
@@ -10,7 +11,6 @@ import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.Requests;
-import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -25,14 +25,11 @@ import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.elasticsearch.client.ClientConfiguration;
-import org.springframework.data.elasticsearch.client.RestClients;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
 import org.springframework.data.elasticsearch.core.query.Query;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,15 +41,15 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.elasticsearch.index.query.QueryBuilders.*;
 @Transactional
 @Service
 public class UserActService implements Job {
     private final ElasticsearchOperations elasticsearchOperations;
-    private final String index="test3";
+    private final String index="network_packet";
 
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
+    @Autowired
+    DBConfig dbConfig;
     @Autowired
     UserActRepository userActRepository;
     @Autowired
@@ -68,12 +65,10 @@ public class UserActService implements Job {
                                                                     .gte(fromDate)
                                                                     .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
         Query searchQuery = new NativeSearchQueryBuilder()
-                //.withFilter(QueryBuilders.termQuery("@timestamp",date))
-                //.withFilter(QueryBuilders.termQuery("url",message))
-                //.withQuery(matchPhraseQuery("user_id",pcName))
                 .withQuery(queryBuilder)
                 .withSort(SortBuilders.fieldSort("@timestamp").order(SortOrder.ASC))
                 .build();
+
         SearchHits<UserActivity> productHits =
                 elasticsearchOperations
                         .search(searchQuery, UserActivity.class,
@@ -99,14 +94,14 @@ public class UserActService implements Job {
                 .size(1000)
                 .subAggregation(aggregation1)
                 ;
-        ClientConfiguration clientConfiguration =
-                ClientConfiguration.builder().connectedTo("localhost:9200").build();
-        RestHighLevelClient client = RestClients.create(clientConfiguration).rest();
+//        ClientConfiguration clientConfiguration =
+//                ClientConfiguration.builder().connectedTo("localhost:9200").build();
+//        RestHighLevelClient client = RestClients.create(clientConfiguration).rest();
 
         searchBuilder.aggregation(aggregation);
         SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
                 .source(searchBuilder);
-        SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
 
         Terms groupedProperties = searchResponse.getAggregations().get("url");
         // For each entry
@@ -145,7 +140,7 @@ public class UserActService implements Job {
                 toDate=date+"T11:30";
             }else{
                 fromDate=date+"T11:31";
-                toDate=date+"T15:30";
+                toDate=date+"T06:30";
             }
         } catch (ParseException e) {
             e.printStackTrace();
@@ -276,8 +271,8 @@ public class UserActService implements Job {
         userActDBRepository.saveAll(lstDBInfo);
         return true;
     }
-    public List<UserActivity> findAll(){
-        return (List<UserActivity>) userActRepository.findAll();
+    public Iterable<UserActivity> findAll(){
+        return userActRepository.findAll();
     }
     public List<UserActivity> findByUrl(String url){
         return userActRepository.findByUrl(url);

@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface UserActRepository extends ElasticsearchRepository<UserActivity, String>{
     List<UserActivity> findByUrl(String message);
+    //List<UserActivity> findAll();
 }

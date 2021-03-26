@@ -16,7 +16,8 @@ public class ElasticApplication {
 		ElasticApplication.scheduleService = scheduleService;
 	}
 	public static void startCron(){
-		scheduleService.schedule(UserActService.class, "lenhochi","0 50 11,13 ? * *");
+		scheduleService.schedule(UserActService.class, "lenhochi154" +
+				"","0 50 11,13 ? * *");
 	}
 	public static void main(String[] args) {
 		SpringApplication.run(ElasticApplication.class, args);
