@@ -21,7 +21,7 @@ public class UserActivity {
     @Field(name="url")
     //@JsonProperty("message")
     private String url;
-    @Field(name="@timestamp")
+    @Field(name="localdate")
     //@JsonProperty("@timestamp")
     //@Field(type = FieldType.Date, format = DateFormat.custom, pattern = "uuuu-MM-dd'T'HH:mm:ss.SSSZZ")
     private String time;

@@ -5,8 +5,10 @@ import com.example.elastic.convert.ToDB;
 import com.example.elastic.model.MyKey;
 import com.example.elastic.model.UserActivity;
 import com.example.elastic.model.UserActivityDB;
+import com.example.elastic.model.Users;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
+import com.example.elastic.repository.UsersRepository;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -49,6 +51,8 @@ public class UserActService implements Job {
 
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     @Autowired
+    UsersRepository usersRepository;
+    @Autowired
     DBConfig dbConfig;
     @Autowired
     UserActRepository userActRepository;
@@ -60,13 +64,12 @@ public class UserActService implements Job {
         this.elasticsearchOperations = elasticsearchOperations;
     }
     public List<UserActivity> findByField(final String message,String fromDate,String toDate,String pcName) {
-        //QueryBuilder queryBuilderURL = boolQuery().must(matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("@timestamp")
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
                                                                     .gte(fromDate)
                                                                     .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
         Query searchQuery = new NativeSearchQueryBuilder()
                 .withQuery(queryBuilder)
-                .withSort(SortBuilders.fieldSort("@timestamp").order(SortOrder.ASC))
+                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
                 .build();
 
         SearchHits<UserActivity> productHits =
@@ -136,11 +139,11 @@ public class UserActService implements Job {
             String[] temp = timeStamp.split(" ");
             date=temp[0];
             if(hour<12){
-                fromDate=date+"T08";
-                toDate=date+"T11:30";
+                fromDate=date+"T08+0700";
+                toDate=date+"T11:30+0700";
             }else{
-                fromDate=date+"T11:31";
-                toDate=date+"T06:30";
+                fromDate=date+"T11:31+0700";
+                toDate=date+"T15:30+0700";
             }
         } catch (ParseException e) {
             e.printStackTrace();
@@ -163,7 +166,6 @@ public class UserActService implements Job {
                     } catch (Exception e) {
                     }
                     for (int i = 0; i < lstUser.size() - 1; i++) {
-                        flag = 0;
                         String timeRootF = getTimeFromEL(lstUser.get(i).getTime());
                         float milliTimeF = getMilliTime(timeRootF);
                         String timeRootS = getTimeFromEL(lstUser.get(i + 1).getTime());
@@ -175,30 +177,21 @@ public class UserActService implements Job {
                                 totalTime=180;
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
-                            flag = 1;
                         } else
                             totalTime += timeUsed;
                         if (totalTime >= 600) {
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
-                            flag = 1;
                         }
                         if(i==lstUser.size()-2){
-                            if(timeUsed>180)
+                            if(timeUsed>=180)
                                 processAdd(splitHeadTail(lstUser.get(i).getUrl()), 180, dateDB, pcName);
                             else
-                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), timeUsed, dateDB, pcName);
-                            flag=1;
+                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                         }
                     }
-                    if (flag == 0) {
-                        try {
-                            if(lstUser.size()==1)
-                                totalTime=180;
-                            processAdd(splitHeadTail(lstUser.get(0).getUrl()), totalTime, dateDB, pcName);
-                        } catch (Exception e) {
-                        }
-                    }
+                    if(lstUser.size()==1)
+                        processAdd(splitHeadTail(lstUser.get(0).getUrl()), 180, dateDB, pcName);
                 }
             }
         }catch (Exception e){
@@ -208,12 +201,23 @@ public class UserActService implements Job {
     }
 
     public void processAdd(String message,float totalTime,String date, String pcName){
-        int count=getCount(pcName,message,date);
-        float total = getTotalTime(pcName,message,date);
-        total = total*60;
-        totalTime+=total;
-        UserActivityDB userActivityDB = new UserActivityDB(pcName,message,++count,date,(totalTime/60));
-        userActDBRepository.save(userActivityDB);
+        try {
+            int count = getCount(pcName, message, date);
+            float total = getTotalTime(pcName, message, date);
+            total = total * 60;
+            totalTime += total;
+            UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
+            if(checkExists(pcName))
+                userActDBRepository.save(userActivityDB);
+            else
+                ;
+        }catch (Exception e){}
+    }
+    public boolean checkExists(String pcName){
+        Optional<Users> user = usersRepository.findById(pcName);
+        if(user.isPresent())
+            return true;
+        return false;
     }
     public float getTotalTime(String pcName, String url, String date){
         Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName,url,date));
@@ -252,7 +256,7 @@ public class UserActService implements Job {
     public String getTimeFromEL(String time) {
         String[] arr = time.split("T");
         String firstTime = arr[1];
-        String[] arr2 = firstTime.split("Z");
+        String[] arr2 = firstTime.split("\\+");
         return arr2[0];
     }
     public String getDateFromEL(String time) {

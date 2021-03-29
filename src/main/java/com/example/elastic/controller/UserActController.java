@@ -1,5 +1,7 @@
 package com.example.elastic.controller;
 
+import com.easyquartz.scheduler.ScheduleService;
+import com.example.elastic.ElasticApplication;
 import com.example.elastic.model.UserActivity;
 import com.example.elastic.model.UserActivityDB;
 import com.example.elastic.repository.UserActDBRepository;
