@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.*;
 @RestController
 public class UserActController {
@@ -48,5 +49,9 @@ public class UserActController {
     @PostMapping("/pull-into-db")
     public boolean pullDataIntoDB(@RequestBody String time) throws IOException {
         return userActService.mainProcessing(time);
+    }
+    @PostMapping("/pull-into-db2")
+    public boolean pullDataIntoDB2(@RequestBody String time) throws IOException, ParseException {
+        return userActService.mainProcessing2(time);
     }
 }

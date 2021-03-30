@@ -16,12 +16,12 @@ public class ElasticApplication {
 		ElasticApplication.scheduleService = scheduleService;
 	}
 	public static void startCron(){
-		scheduleService.schedule(UserActService.class, "lenho3","0 22 11,16 ? * *");
+		scheduleService.schedule(UserActService.class, "lenho15","0 22 11,16 ? * *");
 				//"","0 50 11,13 ? * *");
 			//	"","0/15 * * * * ? *");
 	}
 	public static void main(String[] args) {
 		SpringApplication.run(ElasticApplication.class, args);
-		startCron();
+		//startCron();
 	}
 }

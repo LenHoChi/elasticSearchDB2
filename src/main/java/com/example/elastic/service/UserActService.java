@@ -41,13 +41,14 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Transactional
 @Service
 public class UserActService implements Job {
     private final ElasticsearchOperations elasticsearchOperations;
-    private final String index="network_packet";
+    private final String index = "network_packet";
 
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     @Autowired
@@ -58,15 +59,17 @@ public class UserActService implements Job {
     UserActRepository userActRepository;
     @Autowired
     UserActDBRepository userActDBRepository;
+
     @Autowired
     public UserActService(final ElasticsearchOperations elasticsearchOperations) {
         super();
         this.elasticsearchOperations = elasticsearchOperations;
     }
-    public List<UserActivity> findByField(final String message,String fromDate,String toDate,String pcName) {
+
+    public List<UserActivity> findByField(final String message, String fromDate, String toDate, String pcName) {
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
-                                                                    .gte(fromDate)
-                                                                    .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",message));
+                .gte(fromDate)
+                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
         Query searchQuery = new NativeSearchQueryBuilder()
                 .withQuery(queryBuilder)
                 .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
@@ -77,9 +80,10 @@ public class UserActService implements Job {
                         .search(searchQuery, UserActivity.class,
                                 IndexCoordinates.of(index));
         List<UserActivity> productMatches = new ArrayList<>();
-        productHits.forEach(srchHit-> productMatches.add(srchHit.getContent()));
+        productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
         return productMatches;
     }
+
     public List<String> groupByField() throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(15, TimeUnit.SECONDS));
@@ -88,15 +92,14 @@ public class UserActService implements Job {
 
         TermsAggregationBuilder aggregation1 = AggregationBuilders
                 .terms("url")
-                .field("url"+".keyword").size(1000);
+                .field("url" + ".keyword").size(1000);
 
         // @formatter:off
         TermsAggregationBuilder aggregation = AggregationBuilders
                 .terms("url")
                 .field("user_id" + ".keyword")
                 .size(1000)
-                .subAggregation(aggregation1)
-                ;
+                .subAggregation(aggregation1);
 //        ClientConfiguration clientConfiguration =
 //                ClientConfiguration.builder().connectedTo("localhost:9200").build();
 //        RestHighLevelClient client = RestClients.create(clientConfiguration).rest();
@@ -114,7 +117,7 @@ public class UserActService implements Job {
             entry.getDocCount(); // Doc count
             String x = (String) entry.getKey();
             //x+="PC ";
-            String y = "PC "+x;
+            String y = "PC " + x;
             Terms bucket = entry.getAggregations().get("url");
 
             lst.add(y);
@@ -123,44 +126,45 @@ public class UserActService implements Job {
                 lst.add(bucket1.getKey().toString());
             });
         }
-        return  lst;
+        return lst;
     }
+
     //3mi=10800
     //10mi=36000get
     public Boolean mainProcessing(String timeStamp) throws IOException {
+        final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
-        int hour=0;
-        String date="";
+        int hour = 0;
+        String date = "";
         String fromDate = "";
-        String toDate="";
+        String toDate = "";
         try {
             Date dateFire = sdf.parse(timeStamp);
             hour = dateFire.getHours();
             String[] temp = timeStamp.split(" ");
-            date=temp[0];
-            if(hour<12){
-                fromDate=date+"T08+0700";
-                toDate=date+"T11:30+0700";
-            }else{
-                fromDate=date+"T11:31+0700";
-                toDate=date+"T15:30+0700";
+            date = temp[0];
+            if (hour < 12) {
+                fromDate = date + "T08+0700";
+                toDate = date + "T11:30+0700";
+            } else {
+                fromDate = date + "T11:31+0700";
+                toDate = date + "T15:30+0700";
             }
         } catch (ParseException e) {
             e.printStackTrace();
         }
         try {
             String dateDB = "";
-            String pcName="";
+            String pcName = "";
             List<String> lstRoot = groupByField();
             for (int j = 0; j < lstRoot.size(); j++) {
-                if(lstRoot.get(j).contains("PC")) {
-                    String[]arr = lstRoot.get(j).split(" ");
+                if (lstRoot.get(j).contains("PC")) {
+                    String[] arr = lstRoot.get(j).split(" ");
                     pcName = arr[1];
                 }
                 if (lstRoot.get(j).contains("CONNECT")) {
-                    List<UserActivity> lstUser = findByField(splitHeadTail(lstRoot.get(j)), fromDate,toDate,pcName);
+                    List<UserActivity> lstUser = findByField(splitHeadTail(lstRoot.get(j)), fromDate, toDate, pcName);
                     float totalTime = 0;
-                    int flag = 0;
                     try {
                         dateDB = getDateFromEL(lstUser.get(0).getTime());
                     } catch (Exception e) {
@@ -173,8 +177,8 @@ public class UserActService implements Job {
                         float timeUsed = milliTimeS - milliTimeF;
                         //time between two surf bigger than 3 minutes--->solve // break time =3m
                         if (timeUsed >= 180) {
-                            if(totalTime==0)
-                                totalTime=180;
+                            if (totalTime == 0)
+                                totalTime = 180;
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
                         } else
@@ -183,67 +187,69 @@ public class UserActService implements Job {
                             processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                             totalTime = 0;
                         }
-                        if(i==lstUser.size()-2){
-                            if(timeUsed>=180)
+                        if (i == lstUser.size() - 2) {
+                            if (timeUsed >= 180)
                                 processAdd(splitHeadTail(lstUser.get(i).getUrl()), 180, dateDB, pcName);
                             else
                                 processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
                         }
                     }
-                    if(lstUser.size()==1)
+                    if (lstUser.size() == 1)
                         processAdd(splitHeadTail(lstUser.get(0).getUrl()), 180, dateDB, pcName);
                 }
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             return false;
         }
+        final long endTime = System.currentTimeMillis();
+        System.out.println("Total execution time: " + (endTime - startTime));
         return true;
     }
 
-    public void processAdd(String message,float totalTime,String date, String pcName){
-        try {
-            int count = getCount(pcName, message, date);
-            float total = getTotalTime(pcName, message, date);
-            total = total * 60;
-            totalTime += total;
-            UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
-            if(checkExists(pcName))
-                userActDBRepository.save(userActivityDB);
-            else
-                ;
-        }catch (Exception e){}
+    public void processAdd(String message, float totalTime, String date, String pcName) {
+        int count = getCount(pcName, message, date);
+        float total = getTotalTime(pcName, message, date);
+        total = total * 60;
+        totalTime += total;
+        UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
+        if (checkExists(pcName))
+            userActDBRepository.save(userActivityDB);
     }
-    public boolean checkExists(String pcName){
+    public boolean checkExists(String pcName) {
         Optional<Users> user = usersRepository.findById(pcName);
-        if(user.isPresent())
+        if (user.isPresent())
             return true;
         return false;
     }
-    public float getTotalTime(String pcName, String url, String date){
-        Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName,url,date));
+
+    public float getTotalTime(String pcName, String url, String date) {
+        Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName, url, date));
         List<UserActivityDB> lstUserR = lstUser.stream().collect(Collectors.toList());
-        for(int i=0;i<lstUser.stream().count();i++){
-            if(lstUserR.get(i).getUrl().equals(url)&&lstUserR.get(i).getTime().equals(date)){
+        for (int i = 0; i < lstUser.stream().count(); i++) {
+            if (lstUserR.get(i).getUrl().equals(url) && lstUserR.get(i).getTime().equals(date)) {
                 return lstUserR.get(i).getTotal_time();
             }
         }
         return 0;
     }
-    public int getCount(String pcName, String url, String date){
-        Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName,url,date));
+
+    public int getCount(String pcName, String url, String date) {
+        Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName, url, date));
         List<UserActivityDB> lstUserR = lstUser.stream().collect(Collectors.toList());
-        for(int i=0;i<lstUser.stream().count();i++){
-            if(lstUserR.get(i).getUrl().equals(url)&&lstUserR.get(i).getTime().equals(date)){
+        for (int i = 0; i < lstUser.stream().count(); i++) {
+            if (lstUserR.get(i).getUrl().equals(url) && lstUserR.get(i).getTime().equals(date)) {
                 return lstUserR.get(i).getCount();
             }
         }
         return 0;
     }
-    public String splitHeadTail(String x){
+
+    public String splitHeadTail(String x) {
         String[] arr = x.split(" ");
         String[] arrX = arr[1].split(":");
         return arrX[0];
     }
+
     public float getMilliTime(String time) {
         float total;
         String[] arr = time.split(":");
@@ -253,17 +259,20 @@ public class UserActService implements Job {
         total = hour * 60 * 60 + minute * 60 + second;
         return total;
     }
+
     public String getTimeFromEL(String time) {
         String[] arr = time.split("T");
         String firstTime = arr[1];
         String[] arr2 = firstTime.split("\\+");
         return arr2[0];
     }
+
     public String getDateFromEL(String time) {
         String[] arr = time.split("T");
         return arr[0];
     }
-    public boolean saveAll(){
+
+    public boolean saveAll() {
         ToDB infoToDB = new ToDB();
         Iterable<UserActivity> lstInfo = userActRepository.findAll();
         List<UserActivityDB> lstDBInfo = new ArrayList<>();
@@ -275,10 +284,12 @@ public class UserActService implements Job {
         userActDBRepository.saveAll(lstDBInfo);
         return true;
     }
-    public Iterable<UserActivity> findAll(){
+
+    public Iterable<UserActivity> findAll() {
         return userActRepository.findAll();
     }
-    public List<UserActivity> findByUrl(String url){
+
+    public List<UserActivity> findByUrl(String url) {
         return userActRepository.findByUrl(url);
     }
 
@@ -291,5 +302,117 @@ public class UserActService implements Job {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    //--------------------------------------------------------------------------------------------------------------------------
+    public List<UserActivity> findByField2(final String message, String fromDate, String toDate, String pcName) {
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
+                .gte(fromDate)
+                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
+        Query searchQuery = new NativeSearchQueryBuilder()
+                .withQuery(queryBuilder)
+                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
+                .build();
+
+        SearchHits<UserActivity> productHits =
+                elasticsearchOperations
+                        .search(searchQuery, UserActivity.class,
+                                IndexCoordinates.of(index));
+        List<UserActivity> productMatches = new ArrayList<>();
+        productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
+        return productMatches;
+    }
+
+    public Terms groupByField2() throws IOException {
+        SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
+        searchBuilder.timeout(new TimeValue(15, TimeUnit.SECONDS));
+        searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.DESC));
+        searchBuilder.fetchSource(false);
+
+        TermsAggregationBuilder aggregation1 = AggregationBuilders
+                .terms("url")
+                .field("url" + ".keyword").size(1000);
+
+        TermsAggregationBuilder aggregation = AggregationBuilders
+                .terms("url")
+                .field("user_id" + ".keyword")
+                .size(1000)
+                .subAggregation(aggregation1);
+        searchBuilder.aggregation(aggregation);
+        SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
+                .source(searchBuilder);
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
+
+        Terms groupedProperties = searchResponse.getAggregations().get("url");
+        return groupedProperties;
+    }
+
+    //3mi=10800
+    //10mi=36000get
+    public Boolean mainProcessing2(String timeStamp) throws IOException, ParseException {
+        final long startTime = System.currentTimeMillis();
+        System.out.println(timeStamp);
+        String fromDate = "", toDate = "";
+        Date dateFire = sdf.parse(timeStamp);
+        int hour = dateFire.getHours();
+        String[] temp = timeStamp.split(" ");
+        String date = temp[0];
+        if (hour < 12) {
+            fromDate = date + "T08+0700";
+            toDate = date + "T11:30+0700";
+        } else {
+            fromDate = date + "T11:31+0700";
+            toDate = date + "T15:30+0700";
+        }
+        try {
+            AtomicReference<String> dateDB = new AtomicReference<>("");
+            Terms lstRoot = groupByField2();
+            for (Terms.Bucket entry : lstRoot.getBuckets()) {
+                Terms bucket = entry.getAggregations().get("url");
+                String finalFromDate = fromDate;
+                String finalToDate = toDate;
+                String finalPcName = entry.getKeyAsString();
+                bucket.getBuckets().forEach(bucket1 -> {
+                    String url = bucket1.getKeyAsString();
+                    if (url.contains("CONNECT")) {
+                        List<UserActivity> lstUserRS = findByField2(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
+                        float totalTime = 0;
+                        dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));
+                        for (int i = 0; i < lstUserRS.size() - 1; i++) {
+                            String timeRootF = getTimeFromEL(lstUserRS.get(i).getTime());
+                            float milliTimeF = getMilliTime(timeRootF);
+                            String timeRootS = getTimeFromEL(lstUserRS.get(i + 1).getTime());
+                            float milliTimeS = getMilliTime(timeRootS);
+                            float timeUsed = milliTimeS - milliTimeF;
+                            //time between two surf bigger than 3 minutes--->solve // break time =3m
+                            if (timeUsed >= 180) {
+                                if (totalTime == 0)
+                                    totalTime = 180;
+                                processAdd(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
+                                totalTime = 0;
+                            } else
+                                totalTime += timeUsed;
+                            if (totalTime >= 600) {
+                                processAdd(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
+                                totalTime = 0;
+                            }
+                            if (i == lstUserRS.size() - 2) {
+                                if (timeUsed >= 180)
+                                    processAdd(splitHeadTail(lstUserRS.get(i).getUrl()), 180, dateDB.get(), finalPcName);
+                                else
+                                    processAdd(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
+                            }
+                        }
+                        if (lstUserRS.size() == 1)
+                            processAdd(splitHeadTail(lstUserRS.get(0).getUrl()), 180, dateDB.get(), finalPcName);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        final long endTime = System.currentTimeMillis();
+        System.out.println("Total execution time: " + (endTime - startTime));
+        return true;
     }
 }
