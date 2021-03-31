@@ -1,6 +1,5 @@
 package com.example.elastic.configuration;
 
-import com.quan12yt.demo.CommonDataSource;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.transport.TransportClient;
@@ -22,7 +21,7 @@ import java.sql.SQLException;
 public class DBConfig {
 //    @Bean
 //    public DataSource dataSource() throws SQLException {
-//        return CommonDataSource.getDataSource();
+//        return CommonDataSource.getHikariDataSource();
 //    }
     @Bean
     public RestHighLevelClient elasticsearchClient() {

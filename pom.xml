@@ -51,6 +51,11 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.logging.log4j</groupId>
+			<artifactId>log4j-core</artifactId>
+			<version>2.11.2</version>
+		</dependency>
+		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
@@ -68,7 +73,7 @@
 		<dependency>
 			<groupId>com.github.quan12yt</groupId>
 			<artifactId>s3training-common-dbconnect</artifactId>
-			<version>49312478b8</version>
+			<version>f4852d7880</version>
 		</dependency>
 	</dependencies>
 	<repositories>
@@ -79,15 +84,10 @@
 	</repositories>
 	<build>
 		<plugins>
-
-
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-
 				<configuration>
-
-
 					<excludes>
 						<exclude>
 							<groupId>org.projectlombok</groupId>
@@ -98,5 +98,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

@@ -1,6 +1,7 @@
 package com.example.elastic.repository;
 
 import com.example.elastic.model.UserActivity;
+import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Repository;
 

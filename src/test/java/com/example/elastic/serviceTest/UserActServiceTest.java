@@ -111,7 +111,7 @@ public class UserActServiceTest {
     public void testMilliTime(){
         String time = "06:23:34";
         float timeResult = (float) 23014.0;
-        float result = userActService.getMilliTime(time);
+        float result = userActService.getSecondFromTime(time);
         assertEquals(result,timeResult);
     }
     @Test
