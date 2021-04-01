@@ -40,7 +40,7 @@ public class UserActController {
     }
     @GetMapping("find-by-field")
     public List<UserActivity> solve2(@RequestBody String message) throws IOException {
-        return userActService.findByField(userActService.splitHeadTail(message),"2021-03-19","2021-03-19","PC-LenHo");
+        return userActService.findByField2(userActService.splitHeadTail(message),"2021-03-30","2021-03-31","PC-QUANPHAM$");
     }
     @PostMapping("/saveAll")
     public boolean saveAll() {

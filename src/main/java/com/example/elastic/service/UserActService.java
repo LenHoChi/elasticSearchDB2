@@ -96,13 +96,13 @@ public class UserActService implements Job {
 
         TermsAggregationBuilder aggregation1 = AggregationBuilders
                 .terms("url")
-                .field("url" + ".keyword").size(1000);
+                .field("url" + ".keyword").size(100000);
 
         // @formatter:off
         TermsAggregationBuilder aggregation = AggregationBuilders
                 .terms("url")
                 .field("user_id" + ".keyword")
-                .size(1000)
+                .size(100000)
                 .subAggregation(aggregation1);
 //        ClientConfiguration clientConfiguration =
 //                ClientConfiguration.builder().connectedTo("localhost:9200").build();
@@ -120,12 +120,9 @@ public class UserActService implements Job {
             entry.getKey();// Term
             entry.getDocCount(); // Doc count
             String x = (String) entry.getKey();
-            //x+="PC ";
             String y = "PC " + x;
             Terms bucket = entry.getAggregations().get("url");
-
             lst.add(y);
-
             bucket.getBuckets().stream().forEach(bucket1 -> {
                 lst.add(bucket1.getKey().toString());
             });
@@ -154,8 +151,8 @@ public class UserActService implements Job {
 //            fromDate = date + "T11:31+0700";
 //            toDate = date + "T15:30+0700";
 //        }
-            fromDate = date + "T01+0700";
-            toDate = date + "T23+0700";
+            fromDate = "2021-03-30" + "T01+0700";
+            toDate = "2021-03-31" + "T23+0700";
         } catch (ParseException e) {
             e.printStackTrace();
         }
@@ -168,40 +165,9 @@ public class UserActService implements Job {
                     String[] arr = lstRoot.get(j).split(" ");
                     pcName = arr[1];
                 }
-                if (lstRoot.get(j).contains("CONNECT")) {
+                if (checkContain(lstRoot.get(j))) {
                     List<UserActivity> lstUser = findByField(splitHeadTail(lstRoot.get(j)), fromDate, toDate, pcName);
-                    float totalTime = 0;
-                    try {
-                        dateDB = getDateFromEL(lstUser.get(0).getTime());
-                    } catch (Exception e) {
-                    }
-                    for (int i = 0; i < lstUser.size() - 1; i++) {
-                        String timeRootF = getTimeFromEL(lstUser.get(i).getTime());
-                        float milliTimeF = getSecondFromTime(timeRootF);
-                        String timeRootS = getTimeFromEL(lstUser.get(i + 1).getTime());
-                        float milliTimeS = getSecondFromTime(timeRootS);
-                        float timeUsed = milliTimeS - milliTimeF;
-                        //time between two surf bigger than 3 minutes--->solve // break time =3m
-                        if (timeUsed >= 180) {
-                            if (totalTime == 0)
-                                totalTime = 180;
-                            processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
-                            totalTime = 0;
-                        } else
-                            totalTime += timeUsed;
-                        if (totalTime >= 600) {
-                            processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
-                            totalTime = 0;
-                        }
-                        if (i == lstUser.size() - 2) {
-                            if (timeUsed >= 180)
-                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), 180, dateDB, pcName);
-                            else
-                                processAdd(splitHeadTail(lstUser.get(i).getUrl()), totalTime, dateDB, pcName);
-                        }
-                    }
-                    if (lstUser.size() == 1)
-                        processAdd(splitHeadTail(lstUser.get(0).getUrl()), 180, dateDB, pcName);
+                    subProcess(lstUser,lstRoot.get(j),pcName);
                 }
             }
         } catch (Exception e) {
@@ -408,7 +374,6 @@ public class UserActService implements Job {
         fromDate = "2021-03-30" + "T01+0700";
         toDate = "2021-03-31" + "T23+0700";
         try {
-            AtomicReference<String> dateDB = new AtomicReference<>("");
             Terms lstRoot = groupByField3(fromDate,toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {
                 Terms bucket = entry.getAggregations().get("url");
@@ -417,38 +382,11 @@ public class UserActService implements Job {
                 String finalPcName = entry.getKeyAsString();
                 bucket.getBuckets().forEach(bucket1 -> {
                     String url = bucket1.getKeyAsString();
-                    if (checkContain(url)) {
-                        List<UserActivity> lstUserRS = findByField2(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
-                        float totalTime = 0;
-                        for (int i = 0; i < lstUserRS.size() - 1; i++) {
-                            dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));
-                            String timeRootF = getTimeFromEL(lstUserRS.get(i).getTime());
-                            float secondTimeF = getSecondFromTime(timeRootF);
-                            String timeRootS = getTimeFromEL(lstUserRS.get(i + 1).getTime());
-                            float secondTimeS = getSecondFromTime(timeRootS);
-                            float timeUsed = secondTimeS - secondTimeF;
-                            //time between two surf bigger than 3 minutes--->solve // break time =3m
-                            if (timeUsed >= 180) {
-                                if (totalTime == 0)
-                                    totalTime = 180;
-                                processAdd2(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
-                                totalTime = 0;
-                            } else
-                                totalTime += timeUsed;
-                            if (totalTime >= 600) {
-                                processAdd2(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
-                                totalTime = 0;
-                            }
-                            if (i == lstUserRS.size() - 2) {
-                                if (timeUsed >= 180)
-                                    processAdd2(splitHeadTail(lstUserRS.get(i).getUrl()), 180, dateDB.get(), finalPcName);
-                                else
-                                    processAdd2(splitHeadTail(lstUserRS.get(i).getUrl()), totalTime, dateDB.get(), finalPcName);
-                            }
-                        }
-                        if (lstUserRS.size() == 1)
-                            processAdd2(splitHeadTail(lstUserRS.get(0).getUrl()), 180, dateDB.get(), finalPcName);
+                    if (!checkContain(url)) {
+                        return;
                     }
+                    List<UserActivity> lstUserRS = findByField2(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
+                    subProcess(lstUserRS,url,finalPcName);
                 });
             }
         } catch (Exception e) {
@@ -457,5 +395,37 @@ public class UserActService implements Job {
         final long endTime = System.currentTimeMillis();
         LOGGER.log(Logger.Level.INFO,"Total execution time2: " + (endTime - startTime));
         return true;
+    }
+    public void subProcess(List<UserActivity> lstUserRS, String url, String finalPcName){
+        AtomicReference<String> dateDB = new AtomicReference<>("");
+        float totalTime = 0;
+        for (int i = 0; i < lstUserRS.size() - 1; i++) {
+            dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));
+            String timeRootF = getTimeFromEL(lstUserRS.get(i).getTime());
+            float secondTimeF = getSecondFromTime(timeRootF);
+            String timeRootS = getTimeFromEL(lstUserRS.get(i + 1).getTime());
+            float secondTimeS = getSecondFromTime(timeRootS);
+            float timeUsed = secondTimeS - secondTimeF;
+            //time between two surf bigger than 3 minutes--->solve // break time =3m
+            if (timeUsed >= 180) {
+                if (totalTime == 0)
+                    totalTime = 180;
+                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                totalTime = 0;
+            } else
+                totalTime += timeUsed;
+            if (totalTime >= 600) {
+                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                totalTime = 0;
+            }
+            if (i == lstUserRS.size() - 2) {
+                if (timeUsed >= 180)
+                    processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+                else
+                    processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+            }
+        }
+        if (lstUserRS.size() == 1)
+            processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
 
@@ -47,6 +49,25 @@ public class ElasticApplication {
 //		LOGGER.log(Logger.Level.DEBUG,"Total execution time2: ");
 //
 //		LOGGER.info("dfdffd");
+		//String[] arr = new String[10];
+//		String[] arr = {"1","2","3","4","5"};
+//		for(int i=0;i<arr.length;i++){
+//			if(arr[i]=="3")
+//				continue;
+//			System.out.println(arr[i]);
+//		}
+//		List<String> list = new ArrayList<String>();
+//		list.add("Java");
+//		list.add("PHP");
+//		list.add("C++");
+//		list.add("Python");
+//		for(int i=0;i< arr.length;i++) {
+//			list.forEach((ele) -> {
+//				if (ele == "C++")
+//					return;
+//				System.out.println(ele);
+//			});
+//			System.out.println(arr[i]);
+//		}
 	}
-
 }
