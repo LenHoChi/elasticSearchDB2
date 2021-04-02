@@ -152,14 +152,28 @@ public class UserActService implements Job {
 //            toDate = date + "T15:30+0700";
 //        }
             fromDate = "2021-03-30" + "T01+0700";
-            toDate = "2021-03-31" + "T23+0700";
+            toDate = "2021-03-30" + "T23+0700";
         } catch (ParseException e) {
             e.printStackTrace();
         }
         try {
             String dateDB = "";
             String pcName = "";
-            List<String> lstRoot = groupByField();
+            //List<String> lstRoot = groupByField();
+            Terms groupedProperties = groupByField3(fromDate,toDate);
+            List<String> lstRoot = new ArrayList<>();
+            for (Terms.Bucket entry : groupedProperties.getBuckets()) {
+                entry.getKey();// Term
+                entry.getDocCount(); // Doc count
+                String x = (String) entry.getKey();
+                String y = "PC " + x;
+                Terms bucket = entry.getAggregations().get("url");
+                lstRoot.add(y);
+                bucket.getBuckets().stream().forEach(bucket1 -> {
+                    lstRoot.add(bucket1.getKey().toString());
+                });
+            }
+
             for (int j = 0; j < lstRoot.size(); j++) {
                 if (lstRoot.get(j).contains("PC")) {
                     String[] arr = lstRoot.get(j).split(" ");
@@ -372,7 +386,7 @@ public class UserActService implements Job {
 //            toDate = date + "T15:30+0700";
 //        }
         fromDate = "2021-03-30" + "T01+0700";
-        toDate = "2021-03-31" + "T23+0700";
+        toDate = "2021-03-30" + "T23+0700";
         try {
             Terms lstRoot = groupByField3(fromDate,toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {

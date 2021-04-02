@@ -23,6 +23,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.data.elasticsearch.core.SearchHitsImpl;
+import org.springframework.data.elasticsearch.core.SearchScrollHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.IndexQuery;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
@@ -35,7 +37,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import javax.persistence.Column;
 import javax.persistence.Id;
-
+import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 @SpringBootTest
 @RunWith(SpringRunner.class)
@@ -58,8 +61,7 @@ public class UserActServiceTest {
     private UserActRepository userActRepository;
     @MockBean
     private UserActDBRepository userActDBRepository;
-    @Autowired
-    private ElasticsearchOperations elasticsearchOperations;
+    private ElasticsearchOperations elasticsearchOperations = mock(ElasticsearchOperations.class);
     @Test
     public void testFindAll(){
         UserActivity userActivityA = new UserActivity("1","www.youtube.com","2021-04-23","PC-LenHo");
@@ -103,7 +105,7 @@ public class UserActServiceTest {
     @Test
     public void testTimeFromEL(){
         String time = "2021-12-21T06:23:34Z";
-        String timeResult="06:23:34";
+        String timeResult="06:23:34Z";
         String result = userActService.getTimeFromEL(time);
         assertEquals(result,timeResult);
     }
@@ -173,30 +175,41 @@ public class UserActServiceTest {
         String toDate = "2021-12-21T07";
 
         UserActivity userActivityA = new UserActivity("1","www.facebook.com","2021-04-23","PC-LenHo");
-        UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-05-23","PC-LenHo");
+//        UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-05-23","PC-LenHo");
+//
+//        List<IndexQuery> indexQueries = new ArrayList<>();
+//        IndexQuery indexQuery1 = new IndexQuery();
+//        indexQuery1.setId("so1");
+//        indexQuery1.setObject(userActivityA);
+//        IndexQuery indexQuery2 = new IndexQuery();
+//        indexQuery2.setId("so2");
+//        indexQuery2.setObject(userActivityB);
+//        indexQueries.add(indexQuery1);
+//        indexQueries.add(indexQuery2);
+//        IndexCoordinates index = IndexCoordinates.of("len");
+//        elasticsearchOperations.bulkIndex(indexQueries,index);
+//        elasticsearchOperations.indexOps(UserActivity.class).refresh();
 
-        List<IndexQuery> indexQueries = new ArrayList<>();
-        IndexQuery indexQuery1 = new IndexQuery();
-        indexQuery1.setId("so1");
-        indexQuery1.setObject(userActivityA);
-        IndexQuery indexQuery2 = new IndexQuery();
-        indexQuery2.setId("so2");
-        indexQuery2.setObject(userActivityB);
-        indexQueries.add(indexQuery1);
-        indexQueries.add(indexQuery2);
-        IndexCoordinates index = IndexCoordinates.of("len");
-        elasticsearchOperations.bulkIndex(indexQueries,index);
-        elasticsearchOperations.indexOps(UserActivity.class).refresh();
-//        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("@timestamp")
-//                .gte(fromDate)
-//                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",url));
-//        Query searchQuery = new NativeSearchQueryBuilder()
-//                .withQuery(queryBuilder)
-//                .withSort(SortBuilders.fieldSort("@timestamp").order(SortOrder.ASC))
-//                .build();
-        Query searchQuery = new NativeSearchQueryBuilder().withQuery(QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("url","www.facebook.com"))).build();
-        SearchHits<UserActivity> userActivitySearchHits = elasticsearchOperations.search(searchQuery,UserActivity.class,index);
-        assertThat(userActivitySearchHits).hasSize(2);
+
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
+                .gte(fromDate)
+                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",url));
+        Query searchQuery = new NativeSearchQueryBuilder()
+                .withQuery(queryBuilder)
+                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
+                .build();
+        List<UserActivity> lst = new ArrayList<>();
+        SearchHits<UserActivity> productHits = mock(SearchHits.class);
+      //  productHits.forEach(node->node.getContent().setId("10"));
+//        productHits.stream().map(userActivitySearchHit -> userActivitySearchHit.getContent().setId("1"));
+        List<UserActivity> lstTemp=null;
+        when(elasticsearchOperations.search(searchQuery,UserActivity.class,IndexCoordinates.of("network_packet"))).thenReturn(productHits);
+
+        List<UserActivity> productHits2 = userActService.findByField(url,fromDate,toDate,pcName);
+//        Query searchQuery = new NativeSearchQueryBuilder().withQuery(QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("url","www.facebook.com"))).build();
+//        SearchHits<UserActivity> userActivitySearchHits = elasticsearchOperations.search(searchQuery,UserActivity.class,index);
+//        assertThat(userActivitySearchHits).hasSize(2);
+        assertEquals(productHits2.size(),productHits.get().count());
     }
     @Test
     public void test(){
