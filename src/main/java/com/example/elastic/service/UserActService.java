@@ -87,7 +87,6 @@ public class UserActService implements Job {
         productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
         return productMatches;
     }
-
     public List<String> groupByField() throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(15, TimeUnit.SECONDS));
@@ -173,7 +172,6 @@ public class UserActService implements Job {
                     lstRoot.add(bucket1.getKey().toString());
                 });
             }
-
             for (int j = 0; j < lstRoot.size(); j++) {
                 if (lstRoot.get(j).contains("PC")) {
                     String[] arr = lstRoot.get(j).split(" ");
@@ -294,7 +292,7 @@ public class UserActService implements Job {
     //--------------------------------------------------------------------------------------------------------------------------
 
     public boolean processAdd2(String message, float totalTime, String date, String pcName) {
-        Optional<UserActivityDB> userDB = findUserByID(pcName, message, date);
+        Optional<UserActivityDB> userDB = findUserByIDDB(pcName, message, date);
         int count = 0;
         float total = 0;
         if (userDB.isPresent()) {
@@ -311,7 +309,7 @@ public class UserActService implements Job {
         return false;
     }
 
-    public Optional<UserActivityDB> findUserByID(String pcName, String url, String date) {
+    public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
         return userActDBRepository.findById(new MyKey(pcName, url, date));
     }
 

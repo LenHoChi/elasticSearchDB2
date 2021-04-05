@@ -26,8 +26,8 @@ public class DBConfig {
     @Bean
     public RestHighLevelClient elasticsearchClient() {
         final ClientConfiguration clientConfiguration = ClientConfiguration.builder()
-                .connectedTo("199.30.30.98:9200")  // set the address of the Elasticsearch cluster
-                //.connectedTo("localhost:9200")
+                //.connectedTo("199.30.30.98:9200")  // set the address of the Elasticsearch cluster
+                .connectedTo("localhost:9200")
                 .build();
         return RestClients.create(clientConfiguration).rest();
     }

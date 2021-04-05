@@ -4,12 +4,18 @@ package com.example.elastic.serviceTest;
 import com.example.elastic.model.MyKey;
 import com.example.elastic.model.UserActivity;
 import com.example.elastic.model.UserActivityDB;
+import com.example.elastic.model.Users;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
+import com.example.elastic.repository.UsersRepository;
 import com.example.elastic.service.UserActService;
+import org.apache.lucene.index.Term;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.WildcardQueryBuilder;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
 import org.junit.Test;
@@ -38,14 +44,14 @@ import static org.assertj.core.api.Assertions.*;
 import javax.persistence.Column;
 import javax.persistence.Id;
 import static java.util.Arrays.asList;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 @SpringBootTest
@@ -56,12 +62,18 @@ import static org.mockito.Mockito.when;
 public class UserActServiceTest {
     @Autowired
     private UserActService userActService;
-
     @MockBean
     private UserActRepository userActRepository;
     @MockBean
+    private UsersRepository usersRepository;
+    @MockBean
     private UserActDBRepository userActDBRepository;
-    private ElasticsearchOperations elasticsearchOperations = mock(ElasticsearchOperations.class);
+   // private ElasticsearchOperations elasticsearchOperations2 = mock(ElasticsearchOperations.class);
+    @Autowired
+    private ElasticsearchOperations elasticsearchOperations;
+//    @MockBean
+//    private ElasticsearchOperations elasticsearchOperations2;
+
     @Test
     public void testFindAll(){
         UserActivity userActivityA = new UserActivity("1","www.youtube.com","2021-04-23","PC-LenHo");
@@ -169,50 +181,119 @@ public class UserActServiceTest {
     }
     @Test
     public void findByField(){
-        String url = "CONNECT www.youtube.com:443 HTTP/1.1";
-        String pcName = "PC-LenHo";
-        String fromDate = "2021-12-21T06";
-        String toDate = "2021-12-21T07";
+        String url = "www.facebook.com";
+        String pcName = "PC-LenHo0";
+        String fromDate = "2021-04-02";
+        String toDate = "2021-04-04";
 
-        UserActivity userActivityA = new UserActivity("1","www.facebook.com","2021-04-23","PC-LenHo");
-//        UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-05-23","PC-LenHo");
-//
-//        List<IndexQuery> indexQueries = new ArrayList<>();
-//        IndexQuery indexQuery1 = new IndexQuery();
-//        indexQuery1.setId("so1");
-//        indexQuery1.setObject(userActivityA);
-//        IndexQuery indexQuery2 = new IndexQuery();
-//        indexQuery2.setId("so2");
-//        indexQuery2.setObject(userActivityB);
-//        indexQueries.add(indexQuery1);
-//        indexQueries.add(indexQuery2);
-//        IndexCoordinates index = IndexCoordinates.of("len");
-//        elasticsearchOperations.bulkIndex(indexQueries,index);
+        UserActivity userActivityA = new UserActivity("1","www.facebook.com","2021-04-03","PC-LenHo0");
+        UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-04-03","PC-LenHo0");
+        UserActivity userActivityC = new UserActivity("2","len","2021-04-03","PC-LenHo0");
+
+        List<IndexQuery> indexQueries = new ArrayList<>();
+        IndexQuery indexQuery1 = new IndexQuery();
+        indexQuery1.setId("so1");
+        indexQuery1.setObject(userActivityA);
+        IndexQuery indexQuery2 = new IndexQuery();
+        indexQuery2.setId("so2");
+        indexQuery2.setObject(userActivityB);
+        IndexQuery indexQuery3 = new IndexQuery();
+        indexQuery3.setId("so3");
+        indexQuery3.setObject(userActivityC);
+        indexQueries.add(indexQuery1);
+        indexQueries.add(indexQuery2);
+        indexQueries.add(indexQuery3);
+        IndexCoordinates index = IndexCoordinates.of("network_packet2");
+        elasticsearchOperations.bulkIndex(indexQueries,index);
+//        elasticsearchOperations.refresh(index);
 //        elasticsearchOperations.indexOps(UserActivity.class).refresh();
 
+//        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
+//                .gte(fromDate)
+//                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",url));
 
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
-                .gte(fromDate)
-                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id",pcName)).must(QueryBuilders.matchPhraseQuery("url",url));
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("user_id",pcName));//.must(QueryBuilders.matchPhraseQuery("url",url));
+
         Query searchQuery = new NativeSearchQueryBuilder()
                 .withQuery(queryBuilder)
                 .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
                 .build();
-        List<UserActivity> lst = new ArrayList<>();
-        SearchHits<UserActivity> productHits = mock(SearchHits.class);
+
+        SearchHits<UserActivity> productHits = elasticsearchOperations.search(searchQuery, UserActivity.class,index);
+        assertThat(productHits).isNotNull();
       //  productHits.forEach(node->node.getContent().setId("10"));
 //        productHits.stream().map(userActivitySearchHit -> userActivitySearchHit.getContent().setId("1"));
-        List<UserActivity> lstTemp=null;
-        when(elasticsearchOperations.search(searchQuery,UserActivity.class,IndexCoordinates.of("network_packet"))).thenReturn(productHits);
 
-        List<UserActivity> productHits2 = userActService.findByField(url,fromDate,toDate,pcName);
+    //    when(elasticsearchOperations.search(searchQuery,UserActivity.class,index)).thenReturn(productHits);
+
+        List<UserActivity> result = userActService.findByField(url,fromDate,toDate,pcName);
+
 //        Query searchQuery = new NativeSearchQueryBuilder().withQuery(QueryBuilders.boolQuery().must(QueryBuilders.matchPhraseQuery("url","www.facebook.com"))).build();
 //        SearchHits<UserActivity> userActivitySearchHits = elasticsearchOperations.search(searchQuery,UserActivity.class,index);
 //        assertThat(userActivitySearchHits).hasSize(2);
-        assertEquals(productHits2.size(),productHits.get().count());
+
+        assertEquals(result.size(),5);
+       // assertEquals(productHits.get().count(),10); //==2
+
+      //  assertThat(productHits).isNotNull();
     }
     @Test
-    public void test(){
-        // given
+    public void testFindByField(){
+        String url = "www.facebook.com";
+        String pcName = "PC-LenHo";
+        String fromDate = "2021-04-02";
+        String toDate = "2021-04-05";
+        List<UserActivity> result = userActService.findByField(url,fromDate,toDate,pcName);
+        assertThat(result).isNotNull();
+    }
+    @Test
+    public void testGroupByField() throws IOException {
+        String url = "www.facebook.com";
+        String pcName = "PC-LenHo0";
+        String fromDate = "2021-04-02";
+        String toDate = "2021-04-04";
+        Terms term = userActService.groupByField3(fromDate,toDate);
+        assertThat(term).isNotNull();
+    }
+    @Test
+    public void testFindByIDDB(){
+        UserActivityDB userActivityDBA = new UserActivityDB("1","www.facebook.com",1,"2021-04-05",3.5f);
+        when(userActDBRepository.findById(new MyKey("1","www.facebook.com","2021-04-05"))).thenReturn(Optional.of(userActivityDBA));
+        Optional<UserActivityDB> userActivityDB = userActService.findUserByIDDB("1","www.facebook.com","2021-04-05");
+        assertEquals(userActivityDB.get().getCount(),1);
+    }
+    @Test
+    public void testCheckContain(){
+        Boolean result = userActService.checkContain("CONNECT ");
+        assertTrue(result);
+    }
+    @Test
+    public void testCheckExists(){
+        Users users = new Users("1","newmooncs2@gmail.com");
+        when(usersRepository.findById("len")).thenReturn(Optional.of(users));
+        Boolean result = userActService.checkExists("len");
+        assertTrue(result);
+    }
+    @Test
+    public void testCheckNotExists(){
+        when(usersRepository.findById("len")).thenReturn(Optional.empty());
+        Boolean result = userActService.checkExists("len");
+        assertFalse(result);
+    }
+    @Test
+    public void testProcessAddNotExists(){
+        when(usersRepository.findById("len")).thenReturn(Optional.empty());
+        Boolean result = userActService.processAdd2("www.facebook.com",3f, "2021-04-04","PC-LenHo");
+        assertFalse(result);
+    }
+    @Test
+    public void testProcessAddExists(){
+        Users users = new Users("1","newmooncsu@gmail.com");
+        UserActivityDB userActivityDBA = new UserActivityDB("1","www.facebook.com",1,"2021-04-04",3.5f);
+
+        when(userActDBRepository.findById(new MyKey("len","www.facebook.com","2021-04-04"))).thenReturn(Optional.of(userActivityDBA));
+        when(usersRepository.findById("len")).thenReturn(Optional.of(users));
+        Boolean result = userActService.processAdd2("www.facebook.com",3f,"2021-04-04","len");
+        assertTrue(result);
     }
 }
