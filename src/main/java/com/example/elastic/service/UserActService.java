@@ -70,142 +70,7 @@ public class UserActService implements Job {
         this.elasticsearchOperations = elasticsearchOperations;
     }
 
-    public List<UserActivity> findByField(final String message, String fromDate, String toDate, String pcName) {
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
-                .gte(fromDate)
-                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
-        Query searchQuery = new NativeSearchQueryBuilder()
-                .withQuery(queryBuilder)
-                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
-                .build();
 
-        SearchHits<UserActivity> productHits =
-                elasticsearchOperations
-                        .search(searchQuery, UserActivity.class,
-                                IndexCoordinates.of(index));
-        List<UserActivity> productMatches = new ArrayList<>();
-        productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
-        return productMatches;
-    }
-    public List<String> groupByField() throws IOException {
-        SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
-        searchBuilder.timeout(new TimeValue(15, TimeUnit.SECONDS));
-        searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.DESC));
-        searchBuilder.fetchSource(false);
-
-        TermsAggregationBuilder aggregation1 = AggregationBuilders
-                .terms("url")
-                .field("url" + ".keyword").size(100000);
-
-        // @formatter:off
-        TermsAggregationBuilder aggregation = AggregationBuilders
-                .terms("url")
-                .field("user_id" + ".keyword")
-                .size(100000)
-                .subAggregation(aggregation1);
-//        ClientConfiguration clientConfiguration =
-//                ClientConfiguration.builder().connectedTo("localhost:9200").build();
-//        RestHighLevelClient client = RestClients.create(clientConfiguration).rest();
-
-        searchBuilder.aggregation(aggregation);
-        SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
-                .source(searchBuilder);
-        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
-
-        Terms groupedProperties = searchResponse.getAggregations().get("url");
-        // For each entry
-        List<String> lst = new ArrayList<>();
-        for (Terms.Bucket entry : groupedProperties.getBuckets()) {
-            entry.getKey();// Term
-            entry.getDocCount(); // Doc count
-            String x = (String) entry.getKey();
-            String y = "PC " + x;
-            Terms bucket = entry.getAggregations().get("url");
-            lst.add(y);
-            bucket.getBuckets().stream().forEach(bucket1 -> {
-                lst.add(bucket1.getKey().toString());
-            });
-        }
-        return lst;
-    }
-
-    //3mi=10800
-    //10mi=36000get
-    public Boolean mainProcessing(String timeStamp) throws IOException {
-        final long startTime = System.currentTimeMillis();
-        System.out.println(timeStamp);
-        int hour = 0;
-        String date = "";
-        String fromDate = "";
-        String toDate = "";
-        try {
-            Date dateFire = sdf.parse(timeStamp);
-            hour = dateFire.getHours();
-            String[] temp = timeStamp.split(" ");
-            date = temp[0];
-//        if (hour < 12) {
-//            fromDate = date + "T08+0700";
-//            toDate = date + "T11:30+0700";
-//        } else {
-//            fromDate = date + "T11:31+0700";
-//            toDate = date + "T15:30+0700";
-//        }
-            fromDate = "2021-03-30" + "T01+0700";
-            toDate = "2021-03-30" + "T23+0700";
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
-        try {
-            String dateDB = "";
-            String pcName = "";
-            //List<String> lstRoot = groupByField();
-            Terms groupedProperties = groupByField3(fromDate,toDate);
-            List<String> lstRoot = new ArrayList<>();
-            for (Terms.Bucket entry : groupedProperties.getBuckets()) {
-                entry.getKey();// Term
-                entry.getDocCount(); // Doc count
-                String x = (String) entry.getKey();
-                String y = "PC " + x;
-                Terms bucket = entry.getAggregations().get("url");
-                lstRoot.add(y);
-                bucket.getBuckets().stream().forEach(bucket1 -> {
-                    lstRoot.add(bucket1.getKey().toString());
-                });
-            }
-            for (int j = 0; j < lstRoot.size(); j++) {
-                if (lstRoot.get(j).contains("PC")) {
-                    String[] arr = lstRoot.get(j).split(" ");
-                    pcName = arr[1];
-                }
-                if (checkContain(lstRoot.get(j))) {
-                    List<UserActivity> lstUser = findByField(splitHeadTail(lstRoot.get(j)), fromDate, toDate, pcName);
-                    subProcess(lstUser,lstRoot.get(j),pcName);
-                }
-            }
-        } catch (Exception e) {
-            return false;
-        }
-        final long endTime = System.currentTimeMillis();
-        System.out.println("Total execution time: " + (endTime - startTime));
-        return true;
-    }
-
-    public void processAdd(String message, float totalTime, String date, String pcName) {
-        int count = getCount(pcName, message, date);
-        float total = getTotalTime(pcName, message, date);
-        total = total * 60;
-        totalTime += total;
-        UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
-        if (checkExists(pcName))
-            userActDBRepository.save(userActivityDB);
-    }
-
-    public boolean checkExists(String pcName) {
-        Optional<Users> user = usersRepository.findById(pcName);
-        if (user.isPresent())
-            return true;
-        return false;
-    }
 
     public float getTotalTime(String pcName, String url, String date) {
         Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName, url, date));
@@ -269,7 +134,11 @@ public class UserActService implements Job {
         userActDBRepository.saveAll(lstDBInfo);
         return true;
     }
-
+    public void saveST(){
+        UserActivityDB userActivityDB = new UserActivityDB("pcName", "message", 1, "date", (float) (100 / 60));
+        userActDBRepository.save(userActivityDB);
+        System.out.println("ok");
+    }
     public Iterable<UserActivity> findAll() {
         return userActRepository.findAll();
     }
@@ -283,12 +152,17 @@ public class UserActService implements Job {
         Timestamp scheduledFireTime = new Timestamp(jobExecutionContext.getScheduledFireTime().getTime());
         String strScheduledFireTime = sdf.format(scheduledFireTime);
         try {
-            mainProcessing(strScheduledFireTime);
-        } catch (IOException e) {
+            mainProcessing2(strScheduledFireTime);
+        } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
     }
-
+    public boolean checkExists(String pcName) {
+        Optional<Users> user = usersRepository.findById(pcName);
+        if (user.isPresent())
+            return true;
+        return false;
+    }
     //--------------------------------------------------------------------------------------------------------------------------
 
     public boolean processAdd2(String message, float totalTime, String date, String pcName) {
@@ -303,12 +177,15 @@ public class UserActService implements Job {
         totalTime += total;
         UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
         if (checkExists(pcName)) {
-            userActDBRepository.save(userActivityDB);
-            return true;
+            try {
+                userActDBRepository.save(userActivityDB);
+                return true;
+            }catch (Exception e){
+
+            }
         }
         return false;
     }
-
     public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
         return userActDBRepository.findById(new MyKey(pcName, url, date));
     }
@@ -372,19 +249,13 @@ public class UserActService implements Job {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
-        Date dateFire = sdf.parse(timeStamp);
-        int hour = dateFire.getHours();
-        String[] temp = timeStamp.split(" ");
-        String date = temp[0];
-//        if (hour < 12) {
-//            fromDate = date + "T08+0700";
-//            toDate = date + "T11:30+0700";
-//        } else {
-//            fromDate = date + "T11:31+0700";
-//            toDate = date + "T15:30+0700";
-//        }
+//        Date dateFire = sdf.parse(timeStamp);
+//        int hour = dateFire.getHours();
+//        String[] temp = timeStamp.split(" ");
+//        String date = temp[0];
+
         fromDate = "2021-03-30" + "T01+0700";
-        toDate = "2021-03-30" + "T23+0700";
+        toDate = "2021-04-06" + "T23+0700";
         try {
             Terms lstRoot = groupByField3(fromDate,toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {

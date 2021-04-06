@@ -1,0 +1,19 @@
+{
+    "scenarioName": "Screening API- Get Screening by customerId test",
+    "steps": [
+        {
+            "name": "get_screening_details",
+            "url": "/find-All-Users",
+            "operation": "GET",
+            "request": {
+            },
+            "assertions": {
+                "status": 200,
+                "body": {
+
+                }
+            }
+        }
+
+    ]
+}
