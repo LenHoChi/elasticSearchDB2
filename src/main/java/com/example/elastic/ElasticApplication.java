@@ -31,7 +31,7 @@ public class ElasticApplication {
 	}
 	public static void main(String[] args) {
 		SpringApplication.run(ElasticApplication.class, args);
-//		//startCron();
+//		startCron();
 //		int i=6,j=1;
 ////		System.out.println("i1--->"+i++);
 ////		System.out.println("i2------->"+i);

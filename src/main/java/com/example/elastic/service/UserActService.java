@@ -71,7 +71,6 @@ public class UserActService implements Job {
     }
 
 
-
     public float getTotalTime(String pcName, String url, String date) {
         Optional<UserActivityDB> lstUser = userActDBRepository.findById(new MyKey(pcName, url, date));
         List<UserActivityDB> lstUserR = lstUser.stream().collect(Collectors.toList());
@@ -134,11 +133,13 @@ public class UserActService implements Job {
         userActDBRepository.saveAll(lstDBInfo);
         return true;
     }
-    public void saveST(){
+
+    public void saveST() {
         UserActivityDB userActivityDB = new UserActivityDB("pcName", "message", 1, "date", (float) (100 / 60));
         userActDBRepository.save(userActivityDB);
         System.out.println("ok");
     }
+
     public Iterable<UserActivity> findAll() {
         return userActRepository.findAll();
     }
@@ -157,6 +158,7 @@ public class UserActService implements Job {
             e.printStackTrace();
         }
     }
+
     public boolean checkExists(String pcName) {
         Optional<Users> user = usersRepository.findById(pcName);
         if (user.isPresent())
@@ -180,12 +182,13 @@ public class UserActService implements Job {
             try {
                 userActDBRepository.save(userActivityDB);
                 return true;
-            }catch (Exception e){
+            } catch (Exception e) {
 
             }
         }
         return false;
     }
+
     public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
         return userActDBRepository.findById(new MyKey(pcName, url, date));
     }
@@ -210,8 +213,8 @@ public class UserActService implements Job {
                                 IndexCoordinates.of(index));
         List<UserActivity> productMatches = new ArrayList<>();
         productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
-        if(productMatches.size()==0)
-            LOGGER.info("size ne:---->:"+productMatches.size());
+        if (productMatches.size() == 0)
+            LOGGER.info("size ne:---->:" + productMatches.size());
         return productMatches;
     }
 
@@ -243,21 +246,29 @@ public class UserActService implements Job {
         Terms groupedProperties = searchResponse.getAggregations().get("url");
         return groupedProperties;
     }
-    //3mi=10800
-    //10mi=36000get
-    public Boolean mainProcessing2(String timeStamp) throws ParseException, IOException {
+
+    public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
-//        Date dateFire = sdf.parse(timeStamp);
-//        int hour = dateFire.getHours();
-//        String[] temp = timeStamp.split(" ");
-//        String date = temp[0];
+        Date dateFire = sdf.parse(timeStamp);
+        int hour = dateFire.getHours();
+        String[] temp = timeStamp.split(" ");
+        String date = temp[0];
 
         fromDate = "2021-03-30" + "T01+0700";
-        toDate = "2021-04-06" + "T23+0700";
+        toDate = "2021-04-07" + "T23+0700";
+
+//        if (hour < 12) {
+//            fromDate = date + "T08+0700";
+//            toDate = date + "T11:30+0700";
+//        } else {
+//            fromDate = date + "T11:31+0700";
+//            toDate = date + "T15:30+0700";
+//        }
+
         try {
-            Terms lstRoot = groupByField3(fromDate,toDate);
+            Terms lstRoot = groupByField3(fromDate, toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {
                 Terms bucket = entry.getAggregations().get("url");
                 String finalFromDate = fromDate;
@@ -269,21 +280,74 @@ public class UserActService implements Job {
                         return;
                     }
                     List<UserActivity> lstUserRS = findByField2(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
-                    subProcess(lstUserRS,url,finalPcName);
+                    subProcess(lstUserRS, url, finalPcName);
                 });
             }
         } catch (Exception e) {
             return false;
         }
         final long endTime = System.currentTimeMillis();
-        LOGGER.log(Logger.Level.INFO,"Total execution time2: " + (endTime - startTime));
+        LOGGER.log(Logger.Level.INFO, "Total execution time2: " + (endTime - startTime));
         return true;
     }
-    public void subProcess(List<UserActivity> lstUserRS, String url, String finalPcName){
+    public Boolean mainProcessing2(String timeStamp) throws ParseException, IOException {
+        final long startTime = System.currentTimeMillis();
+        System.out.println(timeStamp);
+        String fromDate = "", toDate = "";
+        Date dateFire = sdf.parse(timeStamp);
+        int hour = dateFire.getHours();
+        String[] temp = timeStamp.split(" ");
+        String date = temp[0];
+        fromDate = "2021-03-30" + "T01+0700";
+        toDate = "2021-04-07" + "T23+0700";
+//        try {
+            Terms lstRoot = groupByField3(fromDate, toDate);
+            for (Terms.Bucket entry : lstRoot.getBuckets()) {
+                Terms bucket = entry.getAggregations().get("url");
+                String finalFromDate = fromDate;
+                String finalToDate = toDate;
+                String finalPcName = entry.getKeyAsString();
+                bucket.getBuckets().forEach(bucket1 -> {
+                    String url = bucket1.getKeyAsString();
+                    if (!checkContain(url)) {
+                        return;
+                    }
+                    List<UserActivity> lstUserRS = findByField2(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
+                    List<String> lstDate = getAllDate(lstUserRS);
+                    for(int i=0;i<lstDate.size();i++){
+                        List<UserActivity> lstUserRS2 = findByField2(splitHeadTail(url), lstDate.get(i), lstDate.get(i), finalPcName);
+
+                        subProcess(lstUserRS2, url, finalPcName);
+                    }
+                });
+            }
+//        } catch (Exception e) {
+//            return false;
+//        }
+        final long endTime = System.currentTimeMillis();
+        LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
+        return true;
+    }
+    public List<String> getAllDate(List<UserActivity> lstUser){
+        List<String> lstDate = new ArrayList<>();
+        for(int i=0;i<lstUser.size();i++){
+            if(!checkSimilarDate(getDateFromEL(lstUser.get(i).getTime()),lstDate))
+                lstDate.add(getDateFromEL(lstUser.get(i).getTime()));
+        }
+        return lstDate;
+    }
+    public boolean checkSimilarDate(String date, List<String> lstDate){
+        for(int i=0;i<lstDate.size();i++){
+            if(lstDate.get(i).equals(date))
+                return true;
+        }
+        return false;
+    }
+    public void subProcess(List<UserActivity> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
+        dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));
         float totalTime = 0;
         for (int i = 0; i < lstUserRS.size() - 1; i++) {
-            dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));
             String timeRootF = getTimeFromEL(lstUserRS.get(i).getTime());
             float secondTimeF = getSecondFromTime(timeRootF);
             String timeRootS = getTimeFromEL(lstUserRS.get(i + 1).getTime());
