@@ -69,5 +69,12 @@ public class ElasticApplication {
 //			});
 //			System.out.println(arr[i]);
 //		}
+//		final long startTime = System.currentTimeMillis();
+//		for(int i=0;i<100000;i++){
+//			if(i%2==0)
+//				System.out.println(i);
+//		}
+//		final long endTime = System.currentTimeMillis();
+//		LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
 	}
 }
