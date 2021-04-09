@@ -9,17 +9,20 @@ import com.example.elastic.model.Users;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.repository.UsersRepository;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.*;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.QueryStringQueryBuilder;
+import org.elasticsearch.search.Scroll;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.ScoreSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
@@ -46,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
 
 @Transactional
@@ -217,31 +221,83 @@ public class UserActService implements Job {
             LOGGER.info("size ne:---->:" + productMatches.size());
         return productMatches;
     }
-    public List<UserActivity> findByField3(final String message, String fromDate, String toDate, String pcName) {
+    public List<UserActivity> findByDate(String fromDate, String toDate, String pcName) throws IOException {
+        QueryBuilder qb = termQuery("multi", "test");
+
+
+        //SearchRequest request = new SearchRequest("test").scroll(new TimeValue(60000));
+        //SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        //searchSourceBuilder.query(qb);
+        //request.source(searchSourceBuilder);
+
+        SearchRequest searchRequest = new SearchRequest("posts");
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(qb);
+       //searchSourceBuilder.size(size);
+        searchSourceBuilder.sort(FieldSortBuilder.DOC_FIELD_NAME, SortOrder.ASC);
+        searchRequest.source(searchSourceBuilder);
+        searchRequest.scroll(TimeValue.timeValueMinutes(1L));
+
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
+
+        String scrollId = searchResponse.getScrollId();
+        SearchHit[] allHits = new SearchHit[0];
+
+        SearchHit[] searchHits = searchResponse.getHits().getHits();
 
 
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
                 .gte(fromDate)
-                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
+                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName));
         Query searchQuery = new NativeSearchQueryBuilder()
                 .withQuery(queryBuilder)
-                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.ASC))
+                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.DESC))
                 .build();
+
 
         SearchHits<UserActivity> productHits =
                 elasticsearchOperations
                         .search(searchQuery, UserActivity.class,
                                 IndexCoordinates.of(index));
 
-
         final long startTime2 = System.currentTimeMillis();
         List<UserActivity> productMatches = new ArrayList<>();
         productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
         if (productMatches.size() == 0)
-            LOGGER.info("size ne:---->:" + productMatches.size());
+            LOGGER.info("size ne2:---->:" + productMatches.size());
         final long endTime2 = System.currentTimeMillis();
         x+=(endTime2-startTime2);
         return productMatches;
+    }
+    public void test(String fromDate, String toDate,String pcName) throws IOException {
+        QueryBuilder qb = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
+                .gte(fromDate)
+                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName));
+
+        final Scroll scroll = new Scroll(TimeValue.timeValueMinutes(1L));
+        SearchRequest searchRequest = new SearchRequest("posts");
+        searchRequest.scroll(scroll);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(qb);
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
+        String scrollId = searchResponse.getScrollId();
+        SearchHit[] searchHits = searchResponse.getHits().getHits();
+
+        while (searchHits != null && searchHits.length > 0) {
+
+            SearchScrollRequest scrollRequest = new SearchScrollRequest(scrollId);
+            scrollRequest.scroll(scroll);
+            searchResponse = dbConfig.elasticsearchClient().scroll(scrollRequest, RequestOptions.DEFAULT);
+            scrollId = searchResponse.getScrollId();
+            searchHits = searchResponse.getHits().getHits();
+        }
+
+        ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
+        clearScrollRequest.addScrollId(scrollId);
+        ClearScrollResponse clearScrollResponse = dbConfig.elasticsearchClient().clearScroll(clearScrollRequest, RequestOptions.DEFAULT);
+        boolean succeeded = clearScrollResponse.isSucceeded();
     }
     public Terms groupByField3(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
@@ -251,16 +307,17 @@ public class UserActService implements Job {
 
         TermsAggregationBuilder aggregation1 = AggregationBuilders
                 .terms("xx")
-                .field("url" + ".keyword").size(100);
-        TermsAggregationBuilder aggregation2 = AggregationBuilders
-                .terms("len")
-                .field("localdate").size(1000);
+                .field("url" + ".keyword").size(100000);
+//        TermsAggregationBuilder aggregation2 = AggregationBuilders
+//                .terms("len")
+//                .field("localdate").size(1000);
 
         TermsAggregationBuilder aggregation = AggregationBuilders
                 .terms("url")
                 .field("user_id" + ".keyword")
-                .size(10)
-                .subAggregation(aggregation1.subAggregation(aggregation2));
+                .size(100000)
+                //.subAggregation(aggregation1.subAggregation(aggregation2));
+                .subAggregation(aggregation1);
 
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate").gte(fromDate).lte(toDate));
 
@@ -328,8 +385,8 @@ public class UserActService implements Job {
         int hour = dateFire.getHours();
         String[] temp = timeStamp.split(" ");
         String date = temp[0];
-        fromDate = "2021-03-30" + "T01+0700";
-        toDate = "2021-04-02" + "T23+0700";
+        fromDate = "2021-04-09" + "T01+0700";
+        toDate = "2021-04-09" + "T23+0700";
 //        try {
             Terms lstRoot = groupByField3(fromDate, toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {
@@ -337,18 +394,17 @@ public class UserActService implements Job {
                 String finalPcName = entry.getKeyAsString();
                 String finalFromDate = fromDate;
                 String finalToDate = toDate;
-
+                List<UserActivity> lstUserTemp = findByDate(finalFromDate,finalToDate,finalPcName);
+                List<String> lstDate = getAllDate(lstUserTemp);
                 bucket.getBuckets().forEach(ele -> {
 
                     String url = ele.getKeyAsString();
                     Terms bucket1 = ele.getAggregations().get("len");
-                    List<String> lstDate = getAllDate2(bucket1);
+
                     if (!checkContain(url)) {
                         return;
                     }
-
                     for(int i=0;i<lstDate.size();i++){
-
                         List<UserActivity> lstUserRS2 = findByField2(splitHeadTail(url), lstDate.get(i), lstDate.get(i), finalPcName);
                         if(lstUserRS2.size()==0){
                             return;
