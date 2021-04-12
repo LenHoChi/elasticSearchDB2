@@ -46,8 +46,20 @@ public class UserActController {
     public boolean pullDataIntoDB2(@RequestBody String time) throws IOException, ParseException {
         return userActService.mainProcessing2(time);
     }
+    @PostMapping("/pull-into-db2")
+    public boolean pullDataIntoDB(@RequestBody String time) throws IOException, ParseException {
+        return userActService.mainProcessing(time);
+    }
+    @PostMapping("/pull-into-db4")
+    public boolean pullDataIntoDB4(@RequestBody String time) throws IOException, ParseException {
+        return userActService.mainProcessing4(time);
+    }
     @GetMapping("/test")
     public void test(){
         userActService.saveST();
+    }
+    @GetMapping("/test2")
+    public List<UserActivity> test2() throws IOException {
+        return userActService.findByField3("www.facebook.com","2021-04-12","2021-04-12","PC-LenHo$");
     }
 }
