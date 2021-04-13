@@ -36,7 +36,7 @@ public class UserActController {
     }
     @GetMapping("find-by-field")
     public List<UserActivity> solve2(@RequestBody String message) throws IOException {
-        return userActService.findByField2(userActService.splitHeadTail(message),"2021-03-30","2021-03-31","PC-QUANPHAM$");
+        return userActService.findByField(userActService.splitHeadTail(message),"2021-03-30","2021-03-31","PC-QUANPHAM$");
     }
     @PostMapping("/saveAll")
     public boolean saveAll() {
@@ -48,11 +48,15 @@ public class UserActController {
     }
     @PostMapping("/pull-into-db2")
     public boolean pullDataIntoDB(@RequestBody String time) throws IOException, ParseException {
-        return userActService.mainProcessing(time);
+        return userActService.mainProcessing2(time);
     }
     @PostMapping("/pull-into-db4")
     public boolean pullDataIntoDB4(@RequestBody String time) throws IOException, ParseException {
-        return userActService.mainProcessing4(time);
+        return userActService.mainProcessing(time);
+    }
+    @PostMapping("/pull-into-db5")
+    public boolean pullDataIntoDB5(@RequestBody String time) throws IOException, ParseException {
+        return userActService.mainProcessingTerm(time);
     }
     @GetMapping("/test")
     public void test(){
@@ -60,6 +64,6 @@ public class UserActController {
     }
     @GetMapping("/test2")
     public List<UserActivity> test2() throws IOException {
-        return userActService.findByField3("www.facebook.com","2021-04-12","2021-04-12","PC-LenHo$");
+        return userActService.findByFieldCroll("www.facebook.com","2021-04-12","2021-04-12","PC-LenHo$");
     }
 }

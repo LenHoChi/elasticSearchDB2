@@ -249,7 +249,7 @@ public class UserActServiceTest {
         String pcName = "PC-LenHo";
         String fromDate = "2021-04-02";
         String toDate = "2021-04-05";
-        List<UserActivity> result = userActService.findByField2(url,fromDate,toDate,pcName);
+        List<UserActivity> result = userActService.findByField(url,fromDate,toDate,pcName);
         assertThat(result).isNotNull();
     }
     @Test
@@ -258,7 +258,7 @@ public class UserActServiceTest {
         String pcName = "PC-LenHo0";
         String fromDate = "2021-04-02";
         String toDate = "2021-04-04";
-        Terms term = userActService.groupByField3(fromDate,toDate);
+        Terms term = userActService.groupByField(fromDate,toDate);
         assertThat(term).isNotNull();
     }
     @Test

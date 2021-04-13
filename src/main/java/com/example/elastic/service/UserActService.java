@@ -23,6 +23,11 @@ import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.search.Scroll;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
+import org.elasticsearch.search.aggregations.BucketOrder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeValuesSourceBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -161,7 +166,7 @@ public class UserActService implements Job {
         Timestamp scheduledFireTime = new Timestamp(jobExecutionContext.getScheduledFireTime().getTime());
         String strScheduledFireTime = sdf.format(scheduledFireTime);
         try {
-            mainProcessing2(strScheduledFireTime);
+            mainProcessing(strScheduledFireTime);
         } catch (IOException | ParseException e) {
             e.printStackTrace();
         }
@@ -206,7 +211,7 @@ public class UserActService implements Job {
         return arr[0].contains("CONNECT");
     }
 
-    public List<UserActivity> findByField2(final String message, String fromDate, String toDate, String pcName) {
+    public List<UserActivity> findByField(final String message, String fromDate, String toDate, String pcName) {
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
                 .gte(fromDate)
                 .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
@@ -225,57 +230,7 @@ public class UserActService implements Job {
             LOGGER.info("size ne:---->:" + productMatches.size());
         return productMatches;
     }
-    public List<UserActivity> findByDate(String fromDate, String toDate, String pcName) throws IOException {
-        QueryBuilder qb = termQuery("multi", "test");
-
-
-        //SearchRequest request = new SearchRequest("test").scroll(new TimeValue(60000));
-        //SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        //searchSourceBuilder.query(qb);
-        //request.source(searchSourceBuilder);
-
-        SearchRequest searchRequest = new SearchRequest("posts");
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(qb);
-       //searchSourceBuilder.size(size);
-        searchSourceBuilder.sort(FieldSortBuilder.DOC_FIELD_NAME, SortOrder.ASC);
-        searchRequest.source(searchSourceBuilder);
-        searchRequest.scroll(TimeValue.timeValueMinutes(1L));
-
-        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
-
-        String scrollId = searchResponse.getScrollId();
-        SearchHit[] allHits = new SearchHit[0];
-
-        SearchHit[] searchHits = searchResponse.getHits().getHits();
-
-
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
-                .gte(fromDate)
-                .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName));
-        Query searchQuery = new NativeSearchQueryBuilder()
-                .withQuery(queryBuilder)
-                .withSort(SortBuilders.fieldSort("localdate").order(SortOrder.DESC))
-                .build();
-
-
-        SearchHits<UserActivity> productHits =
-                elasticsearchOperations
-                        .search(searchQuery, UserActivity.class,
-                                IndexCoordinates.of(index));
-
-        final long startTime2 = System.currentTimeMillis();
-        List<UserActivity> productMatches = new ArrayList<>();
-        productHits.forEach(srchHit -> productMatches.add(srchHit.getContent()));
-        if (productMatches.size() == 0)
-            LOGGER.info("size ne2:---->:" + productMatches.size());
-        final long endTime2 = System.currentTimeMillis();
-        x+=(endTime2-startTime2);
-        return productMatches;
-    }
-    public List<UserActivity> findByField3(final String message,String fromDate, String toDate,String pcName) throws IOException {
-        final long startTime = System.currentTimeMillis();
-
+    public List<UserActivity> findByFieldCroll(final String message,String fromDate, String toDate,String pcName) throws IOException {
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
                 .gte(fromDate)
                 .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
@@ -308,70 +263,27 @@ public class UserActService implements Job {
             scrollId = searchResponse.getScrollId();
             searchHits = searchResponse.getHits().getHits();
         }
-        final long endTime = System.currentTimeMillis();
-        //System.out.println(lstUserTemp.size());
-        long x = startTime - endTime;
-       // System.out.println("time is :"+x);
-//        lstUserTemp.forEach((UserActivity u)->{
-//            System.out.println(u.getTime());
-//        });
         ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
         clearScrollRequest.addScrollId(scrollId);
         ClearScrollResponse clearScrollResponse = dbConfig.elasticsearchClient().clearScroll(clearScrollRequest, RequestOptions.DEFAULT);
 //        boolean succeeded = clearScrollResponse.isSucceeded();
         return lstUserTemp;
     }
-    public Terms groupByField3(String fromDate, String toDate) throws IOException {
+    public Terms groupByField(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
         searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.DESC));
         searchBuilder.fetchSource(false);
 
         TermsAggregationBuilder aggregation1 = AggregationBuilders
-                .terms("xx")
-                .field("url" + ".keyword").size(100000);
-//        TermsAggregationBuilder aggregation2 = AggregationBuilders
-//                .terms("len")
-//                .field("localdate").size(1000);
-
-        TermsAggregationBuilder aggregation = AggregationBuilders
-                .terms("url")
-                .field("user_id" + ".keyword")
-                .size(100000)
-                //.subAggregation(aggregation1.subAggregation(aggregation2));
-                .subAggregation(aggregation1);
-
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate").gte(fromDate).lte(toDate));
-
-        searchBuilder.query(queryBuilder);
-        searchBuilder.aggregation(aggregation);
-
-        SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
-                .source(searchBuilder);
-        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
-
-        Terms groupedProperties = searchResponse.getAggregations().get("url");
-        return groupedProperties;
-    }
-    public Terms groupByField4(String fromDate, String toDate) throws IOException {
-        SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
-        searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
-        searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.ASC));
-        searchBuilder.fetchSource(false);
-
-        TermsAggregationBuilder aggregation1 = AggregationBuilders
                 .terms("url")
                 .field("url" + ".keyword").size(100000);
-        TermsAggregationBuilder aggregation2 = AggregationBuilders
-                .terms("date")
-                .field("localdate").size(100000);
 
         TermsAggregationBuilder aggregation = AggregationBuilders
                 .terms("id")
                 .field("user_id" + ".keyword")
                 .size(100000)
-                .subAggregation(aggregation1.subAggregation(aggregation2));
-                //.subAggregation(aggregation1);
+                .subAggregation(aggregation1);
 
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate").gte(fromDate).lte(toDate));
 
@@ -385,18 +297,115 @@ public class UserActService implements Job {
         Terms groupedProperties = searchResponse.getAggregations().get("id");
         return groupedProperties;
     }
-    public Boolean mainProcessing4(String timeStamp) throws ParseException, IOException {
+    public Terms groupByFieldUpdateTerm(String fromDate, String toDate) throws IOException {
+        SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
+        searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
+        //searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.ASC));
+        searchBuilder.fetchSource(false);
+
+        TermsAggregationBuilder aggregation1 = AggregationBuilders
+                .terms("url")
+                .field("url" + ".keyword").size(100000);
+        TermsAggregationBuilder aggregation2 = AggregationBuilders
+                .terms("date")
+                .field("localdate").size(100000)
+                .order(BucketOrder.aggregation("_key",true))
+                ;
+
+        TermsAggregationBuilder aggregation = AggregationBuilders
+                .terms("id")
+                .field("user_id" + ".keyword")
+                .size(100000)
+                .subAggregation(aggregation1.subAggregation(aggregation2));
+        //.subAggregation(aggregation1);
+
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate").gte(fromDate).lte(toDate));
+
+        searchBuilder.query(queryBuilder);
+        searchBuilder.aggregation(aggregation);
+        //searchBuilder.sort("@timestamp",SortOrder.ASC);
+
+        SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
+                .source(searchBuilder);
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
+
+        Terms groupedProperties = searchResponse.getAggregations().get("id");
+        return groupedProperties;
+    }
+    public CompositeAggregation groupByFieldUpdateComposite(String fromDate, String toDate) throws IOException {
+        SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
+        searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
+        //searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.ASC));
+        searchBuilder.fetchSource(false);
+
+        TermsAggregationBuilder aggregation1 = AggregationBuilders
+                .terms("url")
+                .field("url" + ".keyword").size(100000);
+        TermsAggregationBuilder aggregation2 = AggregationBuilders
+                .terms("date1")
+                .field("localdate").size(100000)
+                .order(BucketOrder.aggregation("_key",true))
+                ;
+
+
+        List<CompositeValuesSourceBuilder<?>> sources = new ArrayList<>();
+        sources.add(new TermsValuesSourceBuilder("product").field("user_id.keyword"));
+        CompositeAggregationBuilder compositeAggregationBuilder =
+                new CompositeAggregationBuilder("byProductAttributes", sources).size(10000);
+
+        compositeAggregationBuilder.subAggregation(aggregation1.subAggregation(aggregation2));
+
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate").gte(fromDate).lte(toDate));
+
+        searchBuilder.query(queryBuilder);
+        searchBuilder.aggregation(compositeAggregationBuilder);
+        //searchBuilder.sort("@timestamp",SortOrder.ASC);
+
+        SearchRequest searchRequest = Requests.searchRequest(index).allowPartialSearchResults(true)
+                .source(searchBuilder);
+        SearchResponse searchResponse = dbConfig.elasticsearchClient().search(searchRequest, RequestOptions.DEFAULT);
+
+        CompositeAggregation compositeAggregation = searchResponse.getAggregations().get("byProductAttributes");
+        return compositeAggregation;
+    }
+    public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
         fromDate = "2021-04-12" + "T01+0700";
         toDate = "2021-04-12" + "T23+0700";
-        Terms lstRoot = groupByField4(fromDate, toDate);
+        CompositeAggregation lstRoot = groupByFieldUpdateComposite(fromDate, toDate);
+        for (CompositeAggregation.Bucket entry : lstRoot.getBuckets()) {
+            Terms bucket = entry.getAggregations().get("url");
+            String finalPcName = (String) entry.getKey().get("product");
+            bucket.getBuckets().forEach(ele -> {
+                List<String> lstDate = new ArrayList<>();
+                String url = ele.getKeyAsString();
+                Terms bucket1 = ele.getAggregations().get("date1");
+                for(Terms.Bucket entry1 : bucket1.getBuckets()){
+                    lstDate.add(entry1.getKeyAsString());
+                }
+                if (!checkContain(url)) {
+                    return;
+                }
+                executeProcess(lstDate,url,finalPcName);
+                //subProcess(lstDate,url,finalPcName);
+            });
+        }
+        final long endTime = System.currentTimeMillis();
+        LOGGER.log(Logger.Level.INFO, "Total execution time4: " + (endTime-startTime));
+        return true;
+    }
+    public Boolean mainProcessingTerm(String timeStamp) throws ParseException, IOException {
+        final long startTime = System.currentTimeMillis();
+        System.out.println(timeStamp);
+        String fromDate = "", toDate = "";
+        fromDate = "2021-04-12" + "T01+0700";
+        toDate = "2021-04-13" + "T23+0700";
+        Terms lstRoot = groupByFieldUpdateTerm(fromDate, toDate);
         for (Terms.Bucket entry : lstRoot.getBuckets()) {
             Terms bucket = entry.getAggregations().get("url");
             String finalPcName = entry.getKeyAsString();
-            String finalFromDate = fromDate;
-            String finalToDate = toDate;
             bucket.getBuckets().forEach(ele -> {
                 List<String> lstDate = new ArrayList<>();
                 String url = ele.getKeyAsString();
@@ -407,14 +416,33 @@ public class UserActService implements Job {
                 if (!checkContain(url)) {
                     return;
                 }
-                subProcess(lstDate, url, finalPcName);
+                executeProcess(lstDate,url,finalPcName);
+                //subProcess(lstDate,url,finalPcName);
             });
         }
         final long endTime = System.currentTimeMillis();
         LOGGER.log(Logger.Level.INFO, "Total execution time4: " + (endTime-startTime));
         return true;
     }
-    public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
+    public void executeProcess(List<String> lstDate,String url, String finalPcName){
+        List<String> lstDate2 = new ArrayList<>();
+        for(int i=0;i<lstDate.size()-1;i++){
+            if(getDateFromEL(lstDate.get(i)).equalsIgnoreCase(getDateFromEL(lstDate.get(i+1)))){
+                lstDate2.add(lstDate.get(i));
+            }else{
+                lstDate2.add(lstDate.get(i));
+                subProcess(lstDate2, url, finalPcName);
+                lstDate2 = new ArrayList<>();
+            }
+            if(i==lstDate.size()-2){
+                lstDate2.add(lstDate.get(i+1));
+                subProcess(lstDate2, url, finalPcName);
+            }
+        }
+        if(lstDate.size()==1)
+            subProcess(lstDate,url,finalPcName);
+    }
+    public Boolean mainProcessing2(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
@@ -433,9 +461,7 @@ public class UserActService implements Job {
 //            fromDate = date + "T11:31+0700";
 //            toDate = date + "T15:30+0700";
 //        }
-
-//        try {
-            Terms lstRoot = groupByField3(fromDate, toDate);
+            Terms lstRoot = groupByField(fromDate, toDate);
             for (Terms.Bucket entry : lstRoot.getBuckets()) {
                 Terms bucket = entry.getAggregations().get("xx");
                 String finalFromDate = fromDate;
@@ -448,147 +474,16 @@ public class UserActService implements Job {
                     }
                     List<UserActivity> lstUserRS = null;
                     try {
-
-                        lstUserRS = findByField3(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
-
+                        lstUserRS = findByFieldCroll(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-
                     subProcess2(lstUserRS, url, finalPcName);
-
-//                    x+=endTime-startTime;
                 });
             }
         final long endTime = System.currentTimeMillis();
         LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime-startTime));
-//        } catch (Exception e) {
-//            return false;
-//        }
         return true;
-    }
-    public Boolean mainProcessing3(String timeStamp) throws ParseException, IOException {
-        System.out.println(timeStamp);
-        String fromDate = "", toDate = "";
-        Date dateFire = sdf.parse(timeStamp);
-        int hour = dateFire.getHours();
-        String[] temp = timeStamp.split(" ");
-        String date = temp[0];
-
-        fromDate = "2021-04-12" + "T01+0700";
-        toDate = "2021-04-12" + "T23+0700";
-
-//        if (hour < 12) {
-//            fromDate = date + "T08+0700";
-//            toDate = date + "T11:30+0700";
-//        } else {
-//            fromDate = date + "T11:31+0700";
-//            toDate = date + "T15:30+0700";
-//        }
-
-//        try {
-        Terms lstRoot = groupByField3(fromDate, toDate);
-        for (Terms.Bucket entry : lstRoot.getBuckets()) {
-            Terms bucket = entry.getAggregations().get("xx");
-            String finalFromDate = fromDate;
-            String finalToDate = toDate;
-            String finalPcName = entry.getKeyAsString();
-            bucket.getBuckets().forEach(bucket1 -> {
-                String url = bucket1.getKeyAsString();
-                if (!checkContain(url)) {
-                    return;
-                }
-                List<UserActivity> lstUserRS = null;
-                try {
-
-                    lstUserRS = findByField3(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                final long startTime = System.currentTimeMillis();
-                subProcess2(lstUserRS, url, finalPcName);
-                final long endTime = System.currentTimeMillis();
-                x+=endTime-startTime;
-            });
-        }
-        LOGGER.log(Logger.Level.INFO, "Total execution time22: " + x);
-//        } catch (Exception e) {
-//            return false;
-//        }
-        return true;
-    }
-    long x =0;
-    public Boolean mainProcessing2(String timeStamp) throws ParseException, IOException {
-        System.out.println(x);
-        final long startTime = System.currentTimeMillis();
-        System.out.println(timeStamp);
-        String fromDate = "", toDate = "";
-        Date dateFire = sdf.parse(timeStamp);
-        int hour = dateFire.getHours();
-        String[] temp = timeStamp.split(" ");
-        String date = temp[0];
-        fromDate = "2021-04-09" + "T01+0700";
-        toDate = "2021-04-09" + "T23+0700";
-//        try {
-            Terms lstRoot = groupByField3(fromDate, toDate);
-            for (Terms.Bucket entry : lstRoot.getBuckets()) {
-                Terms bucket = entry.getAggregations().get("xx");
-                String finalPcName = entry.getKeyAsString();
-                String finalFromDate = fromDate;
-                String finalToDate = toDate;
-                List<UserActivity> lstUserTemp = findByDate(finalFromDate,finalToDate,finalPcName);
-                List<String> lstDate = getAllDate(lstUserTemp);
-                bucket.getBuckets().forEach(ele -> {
-
-                    String url = ele.getKeyAsString();
-                    Terms bucket1 = ele.getAggregations().get("len");
-
-                    if (!checkContain(url)) {
-                        return;
-                    }
-                    for(int i=0;i<lstDate.size();i++){
-                        List<UserActivity> lstUserRS2 = findByField2(splitHeadTail(url), lstDate.get(i), lstDate.get(i), finalPcName);
-                        if(lstUserRS2.size()==0){
-                            return;
-                        }
-                        subProcess2(lstUserRS2, url, finalPcName);
-                    }
-                });
-            }
-//        } catch (Exception e) {
-//            return false;
-//        }
-        final long endTime = System.currentTimeMillis();
-        LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
-        LOGGER.log(Logger.Level.INFO,"all is "+x);
-        return true;
-    }
-    //just --> save to db: 7s
-    //lstUser2 23s
-    //in for --> 31s
-    public List<String> getAllDate(List<UserActivity> lstUser){
-        List<String> lstDate = new ArrayList<>();
-        for(int i=0;i<lstUser.size();i++){
-            if(!lstDate.contains(getDateFromEL(lstUser.get(i).getTime())))
-                lstDate.add(getDateFromEL(lstUser.get(i).getTime()));
-        }
-        return lstDate;
-    }
-    public List<String> getAllDate2(Terms bucket1){
-        List<String> lstDate = new ArrayList<>();
-        bucket1.getBuckets().forEach(ele->{
-            lstDate.add(getDateFromEL(ele.getKeyAsString()));
-        });
-        return getAllDate3(lstDate);
-    }
-    public List<String> getAllDate3(List<String> lstUser){
-        List<String> lstDate = new ArrayList<>();
-        for(int i=0;i<lstUser.size();i++){
-            if(!lstDate.contains(lstUser.get(i)))
-                lstDate.add(lstUser.get(i));
-        }
-        return lstDate;
     }
     public void subProcess(List<String> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
