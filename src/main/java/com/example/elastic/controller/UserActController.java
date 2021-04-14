@@ -4,8 +4,10 @@ import com.easyquartz.scheduler.ScheduleService;
 import com.example.elastic.ElasticApplication;
 import com.example.elastic.model.UserActivity;
 import com.example.elastic.model.UserActivityDB;
+import com.example.elastic.model.Users;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
+import com.example.elastic.repository.UsersRepository;
 import com.example.elastic.service.UserActService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,8 @@ import java.util.*;
 @RestController
 public class UserActController {
 
+    @Autowired
+    public UsersRepository usersRepository;
     @Autowired
     private UserActService userActService;
     @Autowired
@@ -65,5 +69,22 @@ public class UserActController {
     @GetMapping("/test2")
     public List<UserActivity> test2() throws IOException {
         return userActService.findByFieldCroll("www.facebook.com","2021-04-12","2021-04-12","PC-LenHo$");
+    }
+    @GetMapping("/test3")
+    public void test3(){
+        final long start = System.currentTimeMillis();
+        List<Users> lstUsers = new ArrayList<>();
+        for(int i=0;i<10000;i++){
+            Users users = new Users("name"+i,"email");
+            lstUsers.add(users);
+        }
+        usersRepository.saveAll(lstUsers);
+        //---------------
+//		for(int i=0;i<10000;i++){
+//			Users users = new Users("name"+i,"email");
+//			usersRepository.save(users);
+//		}
+        final  long end = System.currentTimeMillis();
+        System.out.println(end-start);
     }
 }

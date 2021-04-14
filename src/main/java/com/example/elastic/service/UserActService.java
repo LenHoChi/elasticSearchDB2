@@ -181,7 +181,10 @@ public class UserActService implements Job {
     //--------------------------------------------------------------------------------------------------------------------------
 
     public boolean processAdd2(String message, float totalTime, String date, String pcName) {
+        final long start = System.currentTimeMillis();
         Optional<UserActivityDB> userDB = findUserByIDDB(pcName, message, date);
+        final long end = System.currentTimeMillis();
+        findTime += (end - start);
         int count = 0;
         float total = 0;
         if (userDB.isPresent()) {
@@ -192,16 +195,19 @@ public class UserActService implements Job {
         totalTime += total;
         UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
         if (checkExists(pcName)) {
-            try {
-                userActDBRepository.save(userActivityDB);
-                return true;
-            } catch (Exception e) {
-
-            }
+            lstDbList.add(userActivityDB);
+//            if(lstDbList.size()>100) {//lis,zide=130  1.100-->add, 0-->30 miss //add to db
+//                userActDBRepository.saveAll(lstDbList);
+//                lstDbList = new ArrayList<>();
+//            }
+            return true;
         }
         return false;
     }
-
+    List<UserActivityDB> lstDbList = new ArrayList<>();
+    long findTime = 0;
+    long z = 0;
+    long saveTime = 0;
     public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
         return userActDBRepository.findById(new MyKey(pcName, url, date));
     }
@@ -230,7 +236,8 @@ public class UserActService implements Job {
             LOGGER.info("size ne:---->:" + productMatches.size());
         return productMatches;
     }
-    public List<UserActivity> findByFieldCroll(final String message,String fromDate, String toDate,String pcName) throws IOException {
+
+    public List<UserActivity> findByFieldCroll(final String message, String fromDate, String toDate, String pcName) throws IOException {
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.rangeQuery("localdate")
                 .gte(fromDate)
                 .lte(toDate)).must(QueryBuilders.matchPhraseQuery("user_id", pcName)).must(QueryBuilders.matchPhraseQuery("url", message));
@@ -240,7 +247,7 @@ public class UserActService implements Job {
         searchRequest.scroll(scroll);
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(queryBuilder);
-        searchSourceBuilder.sort("localdate",SortOrder.ASC);
+        searchSourceBuilder.sort("localdate", SortOrder.ASC);
 //        searchSourceBuilder.size(10);
         searchRequest.source(searchSourceBuilder);
 
@@ -252,8 +259,8 @@ public class UserActService implements Job {
         while (searchHits != null && searchHits.length > 0) {
             SearchScrollRequest scrollRequest = new SearchScrollRequest(scrollId);
             scrollRequest.scroll(scroll);
-            for(SearchHit hit : searchHits) {
-               // Map map = hit.getSourceAsMap();
+            for (SearchHit hit : searchHits) {
+                // Map map = hit.getSourceAsMap();
                 //System.out.println(map.toString());
                 String source = hit.getSourceAsString();
                 UserActivity userActivity = objectMapper.readValue(source, UserActivity.class);
@@ -269,6 +276,7 @@ public class UserActService implements Job {
 //        boolean succeeded = clearScrollResponse.isSucceeded();
         return lstUserTemp;
     }
+
     public Terms groupByField(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
@@ -297,6 +305,7 @@ public class UserActService implements Job {
         Terms groupedProperties = searchResponse.getAggregations().get("id");
         return groupedProperties;
     }
+
     public Terms groupByFieldUpdateTerm(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
@@ -309,8 +318,7 @@ public class UserActService implements Job {
         TermsAggregationBuilder aggregation2 = AggregationBuilders
                 .terms("date")
                 .field("localdate").size(100000)
-                .order(BucketOrder.aggregation("_key",true))
-                ;
+                .order(BucketOrder.aggregation("_key", true));
 
         TermsAggregationBuilder aggregation = AggregationBuilders
                 .terms("id")
@@ -332,6 +340,7 @@ public class UserActService implements Job {
         Terms groupedProperties = searchResponse.getAggregations().get("id");
         return groupedProperties;
     }
+
     public CompositeAggregation groupByFieldUpdateComposite(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
         searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
@@ -344,9 +353,7 @@ public class UserActService implements Job {
         TermsAggregationBuilder aggregation2 = AggregationBuilders
                 .terms("date1")
                 .field("localdate").size(100000)
-                .order(BucketOrder.aggregation("_key",true))
-                ;
-
+                .order(BucketOrder.aggregation("_key", true));
 
         List<CompositeValuesSourceBuilder<?>> sources = new ArrayList<>();
         sources.add(new TermsValuesSourceBuilder("product").field("user_id.keyword"));
@@ -368,34 +375,47 @@ public class UserActService implements Job {
         CompositeAggregation compositeAggregation = searchResponse.getAggregations().get("byProductAttributes");
         return compositeAggregation;
     }
+    long y = 0;
+
     public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
         fromDate = "2021-04-12" + "T01+0700";
-        toDate = "2021-04-12" + "T23+0700";
+        toDate = "2021-04-13" + "T23+0700";
         CompositeAggregation lstRoot = groupByFieldUpdateComposite(fromDate, toDate);
         for (CompositeAggregation.Bucket entry : lstRoot.getBuckets()) {
             Terms bucket = entry.getAggregations().get("url");
             String finalPcName = (String) entry.getKey().get("product");
             bucket.getBuckets().forEach(ele -> {
+
                 List<String> lstDate = new ArrayList<>();
                 String url = ele.getKeyAsString();
                 Terms bucket1 = ele.getAggregations().get("date1");
-                for(Terms.Bucket entry1 : bucket1.getBuckets()){
+                for (Terms.Bucket entry1 : bucket1.getBuckets()) {
                     lstDate.add(entry1.getKeyAsString());
                 }
                 if (!checkContain(url)) {
                     return;
                 }
-                executeProcess(lstDate,url,finalPcName);
+                final long startTime2 = System.currentTimeMillis();
+                executeProcess(lstDate, url, finalPcName);
+                final long endTime2 = System.currentTimeMillis();
+                z+=(endTime2-startTime2);
                 //subProcess(lstDate,url,finalPcName);
             });
         }
         final long endTime = System.currentTimeMillis();
-        LOGGER.log(Logger.Level.INFO, "Total execution time4: " + (endTime-startTime));
+        LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
+        LOGGER.log(Logger.Level.INFO, "find time :" + findTime);
+        findTime = 0;
+        LOGGER.log(Logger.Level.INFO, "save time all :" + z);
+        z = 0;
+        LOGGER.log(Logger.Level.INFO, "save time :" + saveTime);
+        saveTime = 0;
         return true;
     }
+
     public Boolean mainProcessingTerm(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
@@ -410,38 +430,46 @@ public class UserActService implements Job {
                 List<String> lstDate = new ArrayList<>();
                 String url = ele.getKeyAsString();
                 Terms bucket1 = ele.getAggregations().get("date");
-                for(Terms.Bucket entry1 : bucket1.getBuckets()){
+                for (Terms.Bucket entry1 : bucket1.getBuckets()) {
                     lstDate.add(entry1.getKeyAsString());
                 }
                 if (!checkContain(url)) {
                     return;
                 }
-                executeProcess(lstDate,url,finalPcName);
+                executeProcess(lstDate, url, finalPcName);
                 //subProcess(lstDate,url,finalPcName);
             });
         }
         final long endTime = System.currentTimeMillis();
-        LOGGER.log(Logger.Level.INFO, "Total execution time4: " + (endTime-startTime));
+        LOGGER.log(Logger.Level.INFO, "Total execution time4: " + (endTime - startTime));
         return true;
     }
-    public void executeProcess(List<String> lstDate,String url, String finalPcName){
+
+    public void executeProcess(List<String> lstDate, String url, String finalPcName) {
         List<String> lstDate2 = new ArrayList<>();
-        for(int i=0;i<lstDate.size()-1;i++){
-            if(getDateFromEL(lstDate.get(i)).equalsIgnoreCase(getDateFromEL(lstDate.get(i+1)))){
+        for (int i = 0; i < lstDate.size() - 1; i++) {
+            if (getDateFromEL(lstDate.get(i)).equalsIgnoreCase(getDateFromEL(lstDate.get(i + 1)))) {
                 lstDate2.add(lstDate.get(i));
-            }else{
+            } else {
                 lstDate2.add(lstDate.get(i));
                 subProcess(lstDate2, url, finalPcName);
                 lstDate2 = new ArrayList<>();
             }
-            if(i==lstDate.size()-2){
-                lstDate2.add(lstDate.get(i+1));
+            if (i == lstDate.size() - 2) {
+                lstDate2.add(lstDate.get(i + 1));
                 subProcess(lstDate2, url, finalPcName);
             }
         }
-        if(lstDate.size()==1)
-            subProcess(lstDate,url,finalPcName);
+        if (lstDate.size() == 1)
+            subProcess(lstDate, url, finalPcName);
+        //add to db
+        final long start3 = System.currentTimeMillis();
+        userActDBRepository.saveAll(lstDbList);
+        final long end3 = System.currentTimeMillis();
+        saveTime+=(end3-start3);
+        lstDbList = new ArrayList<>();
     }
+
     public Boolean mainProcessing2(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
@@ -461,30 +489,31 @@ public class UserActService implements Job {
 //            fromDate = date + "T11:31+0700";
 //            toDate = date + "T15:30+0700";
 //        }
-            Terms lstRoot = groupByField(fromDate, toDate);
-            for (Terms.Bucket entry : lstRoot.getBuckets()) {
-                Terms bucket = entry.getAggregations().get("xx");
-                String finalFromDate = fromDate;
-                String finalToDate = toDate;
-                String finalPcName = entry.getKeyAsString();
-                bucket.getBuckets().forEach(bucket1 -> {
-                    String url = bucket1.getKeyAsString();
-                    if (!checkContain(url)) {
-                        return;
-                    }
-                    List<UserActivity> lstUserRS = null;
-                    try {
-                        lstUserRS = findByFieldCroll(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    subProcess2(lstUserRS, url, finalPcName);
-                });
-            }
+        Terms lstRoot = groupByField(fromDate, toDate);
+        for (Terms.Bucket entry : lstRoot.getBuckets()) {
+            Terms bucket = entry.getAggregations().get("xx");
+            String finalFromDate = fromDate;
+            String finalToDate = toDate;
+            String finalPcName = entry.getKeyAsString();
+            bucket.getBuckets().forEach(bucket1 -> {
+                String url = bucket1.getKeyAsString();
+                if (!checkContain(url)) {
+                    return;
+                }
+                List<UserActivity> lstUserRS = null;
+                try {
+                    lstUserRS = findByFieldCroll(splitHeadTail(url), finalFromDate, finalToDate, finalPcName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                subProcess2(lstUserRS, url, finalPcName);
+            });
+        }
         final long endTime = System.currentTimeMillis();
-        LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime-startTime));
+        LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
         return true;
     }
+
     public void subProcess(List<String> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
         dateDB.set(getDateFromEL(lstUserRS.get(0)));
@@ -517,10 +546,11 @@ public class UserActService implements Job {
         if (lstUserRS.size() == 1)
             processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
     }
+
     public float getSecondFromTime2(String time) {
         float total;
         String[] arr = time.split(":");
-        int hour = Integer.parseInt(arr[0])+7;
+        int hour = Integer.parseInt(arr[0]) + 7;
         int minute = Integer.parseInt(arr[1]);
         float second = Float.parseFloat(arr[2]);
         total = hour * 60 * 60 + minute * 60 + second;
@@ -533,6 +563,7 @@ public class UserActService implements Job {
         String[] arr2 = firstTime.split("Z");
         return arr2[0];
     }
+
     public void subProcess2(List<UserActivity> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
         dateDB.set(getDateFromEL(lstUserRS.get(0).getTime()));

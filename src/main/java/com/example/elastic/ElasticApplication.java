@@ -1,6 +1,9 @@
 package com.example.elastic;
 
 import com.easyquartz.scheduler.ScheduleService;
+import com.example.elastic.model.UserActivityDB;
+import com.example.elastic.model.Users;
+import com.example.elastic.repository.UsersRepository;
 import com.example.elastic.service.UserActService;
 
 import org.jboss.logging.Logger;
@@ -19,7 +22,6 @@ import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
 @ComponentScan({"com.example","com.easyquartz"})
 public class ElasticApplication {
 	private static ScheduleService scheduleService;
-
 	@Autowired
 	public ElasticApplication(ScheduleService scheduleService){
 		ElasticApplication.scheduleService = scheduleService;
