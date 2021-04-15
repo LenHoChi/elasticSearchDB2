@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.*;
+
+import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
+
 @RestController
 public class UserActController {
 
@@ -84,7 +87,37 @@ public class UserActController {
 //			Users users = new Users("name"+i,"email");
 //			usersRepository.save(users);
 //		}
-        final  long end = System.currentTimeMillis();
+        final long end = System.currentTimeMillis();
         System.out.println(end-start);
+    }
+    @GetMapping("/test4")
+    public void test4(){
+        List<String> lstKey = new ArrayList<>();
+        List<Users> result = new ArrayList<>();
+        for(int i =0; i<10000;i++){
+            lstKey.add("name"+i);
+        }
+        final long start = System.currentTimeMillis();
+        result = usersRepository.findAllById(lstKey);
+        final long end = System.currentTimeMillis();
+        LOGGER.info("----------all");
+        LOGGER.info("size is: "+result.size());
+        LOGGER.info("time is: "+(end-start));
+    }
+    @GetMapping("/test5")
+    public void test5(){
+        List<String> lstKey = new ArrayList<>();
+        List<Users> result = new ArrayList<>();
+        for(int i =0; i<10000;i++){
+            lstKey.add("name"+i);
+        }
+        final long start = System.currentTimeMillis();
+        for(int i=0;i<10000;i++){
+            result.add(usersRepository.findById(lstKey.get(i)).get());
+        }
+        final long end = System.currentTimeMillis();
+        LOGGER.info("----------sequence");
+        LOGGER.info("size is: "+result.size());
+        LOGGER.info("time is: "+(end-start));
     }
 }

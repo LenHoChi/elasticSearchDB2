@@ -2,10 +2,7 @@ package com.example.elastic.service;
 
 import com.example.elastic.configuration.DBConfig;
 import com.example.elastic.convert.ToDB;
-import com.example.elastic.model.MyKey;
-import com.example.elastic.model.UserActivity;
-import com.example.elastic.model.UserActivityDB;
-import com.example.elastic.model.Users;
+import com.example.elastic.model.*;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.repository.UsersRepository;
@@ -178,9 +175,10 @@ public class UserActService implements Job {
             return true;
         return false;
     }
-    //--------------------------------------------------------------------------------------------------------------------------
 
-    public boolean processAdd2(String message, float totalTime, String date, String pcName) {
+    //--------------------------------------------------------------------------------------------------------------------------
+//dang
+    public boolean processAdd(String message, float totalTime, String date, String pcName) {
         final long start = System.currentTimeMillis();
         Optional<UserActivityDB> userDB = findUserByIDDB(pcName, message, date);
         final long end = System.currentTimeMillis();
@@ -196,18 +194,71 @@ public class UserActService implements Job {
         UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
         if (checkExists(pcName)) {
             lstDbList.add(userActivityDB);
-//            if(lstDbList.size()>100) {//lis,zide=130  1.100-->add, 0-->30 miss //add to db
-//                userActDBRepository.saveAll(lstDbList);
-//                lstDbList = new ArrayList<>();
-//            }
             return true;
         }
         return false;
     }
+
+    public void addLstKeyTemp(String message, String date, String pcName, float totalTime) {
+        MyKey myKey = new MyKey(pcName, message, date);
+        mKey.put(myKey,totalTime);
+    }
+
+    public void processAddCompare(String message, float totalTime, String date, String pcName) {
+        addLstKeyTemp(message, date, pcName, totalTime);
+    }
+
+    public void processAddCompare2(Map<MyKey, Float> mKey) {
+        Set<MyKey> kSet = mKey.keySet();// all mykey
+        List<UserActivityDB> lstResult = userActDBRepository.findAllById(kSet);
+        Map<UserActivityDB,Float> mResultExists = new HashMap<>();
+        for(int i=0;i<lstResult.size();i++){
+            MyKey myKey = new MyKey(lstResult.get(i).getUser_id(), lstResult.get(i).getUrl(), lstResult.get(i).getTime());
+            mResultExists.put(lstResult.get(i),mKey.get(myKey));
+            mKey.remove(myKey);
+        }
+        Map<UserActivityDB,Float> mResultNotExists = new HashMap<>();
+        Set<MyKey> kSet2 = mKey.keySet();
+        for(MyKey myKey : kSet2){
+            UserActivityDB userActivityDB = new UserActivityDB(myKey.getUser_id(), myKey.getUrl(), 0, myKey.getTime(),0);
+            mResultNotExists.put(userActivityDB,mKey.get(myKey));
+        }
+        //--got a list not exists--->lstResultNotExists
+        addToListExistsAndNot(mResultExists,mResultNotExists);
+    }
+    public void addToListExistsAndNot(Map<UserActivityDB, Float> mResultExists, Map<UserActivityDB,Float> mResultNotExists) {
+        int count = 0;
+        float total = 0;
+        float totalTime = 0;
+        Set<UserActivityDB> set1 = mResultExists.keySet();
+        for(UserActivityDB ele : set1){
+            count = ele.getCount();
+            total = ele.getTotal_time();
+            totalTime = mResultExists.get(ele);
+            total *= 60;
+            totalTime += total;
+
+            UserActivityDB userActivityDB = new UserActivityDB(ele.getUser_id(), ele.getUrl(), ++count, ele.getTime(), (totalTime / 60));
+            if (checkExists(ele.getUser_id())) {
+                lstDbList.add(userActivityDB);
+            }
+        }
+        Set<UserActivityDB> set2 = mResultNotExists.keySet();
+        for(UserActivityDB ele : set2){
+            totalTime = mResultNotExists.get(ele);
+
+            UserActivityDB userActivityDB = new UserActivityDB(ele.getUser_id(), ele.getUrl(), 1, ele.getTime(), ((totalTime / 60)));
+            if (checkExists(ele.getUser_id())) {
+                lstDbList.add(userActivityDB);
+            }
+        }
+    }
+    Map<MyKey, Float> mKey = new HashMap<>();
     List<UserActivityDB> lstDbList = new ArrayList<>();
     long findTime = 0;
     long z = 0;
     long saveTime = 0;
+
     public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
         return userActDBRepository.findById(new MyKey(pcName, url, date));
     }
@@ -375,6 +426,7 @@ public class UserActService implements Job {
         CompositeAggregation compositeAggregation = searchResponse.getAggregations().get("byProductAttributes");
         return compositeAggregation;
     }
+
     long y = 0;
 
     public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
@@ -401,7 +453,7 @@ public class UserActService implements Job {
                 final long startTime2 = System.currentTimeMillis();
                 executeProcess(lstDate, url, finalPcName);
                 final long endTime2 = System.currentTimeMillis();
-                z+=(endTime2-startTime2);
+                z += (endTime2 - startTime2);
                 //subProcess(lstDate,url,finalPcName);
             });
         }
@@ -462,11 +514,14 @@ public class UserActService implements Job {
         }
         if (lstDate.size() == 1)
             subProcess(lstDate, url, finalPcName);
+        //xl
+        //prepare list
+        //processAddCompare2(mKey);
         //add to db
         final long start3 = System.currentTimeMillis();
         userActDBRepository.saveAll(lstDbList);
         final long end3 = System.currentTimeMillis();
-        saveTime+=(end3-start3);
+        saveTime += (end3 - start3);
         lstDbList = new ArrayList<>();
     }
 
@@ -514,6 +569,7 @@ public class UserActService implements Job {
         return true;
     }
 
+    //dang
     public void subProcess(List<String> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
         dateDB.set(getDateFromEL(lstUserRS.get(0)));
@@ -528,23 +584,31 @@ public class UserActService implements Job {
             if (timeUsed >= 180) {
                 if (totalTime == 0)
                     totalTime = 180;
-                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+//                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             } else
                 totalTime += timeUsed;
             if (totalTime >= 600) {
-                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+//                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             }
             if (i == lstUserRS.size() - 2) {
                 if (timeUsed >= 180)
-                    processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+                    processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+//                    processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+
                 else
-                    processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                    processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+//                    processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+
             }
         }
         if (lstUserRS.size() == 1)
-            processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+            processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+//            processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+
     }
 
     public float getSecondFromTime2(String time) {
@@ -578,22 +642,22 @@ public class UserActService implements Job {
             if (timeUsed >= 180) {
                 if (totalTime == 0)
                     totalTime = 180;
-                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             } else
                 totalTime += timeUsed;
             if (totalTime >= 600) {
-                processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             }
             if (i == lstUserRS.size() - 2) {
                 if (timeUsed >= 180)
-                    processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+                    processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
                 else
-                    processAdd2(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                    processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
             }
         }
         if (lstUserRS.size() == 1)
-            processAdd2(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+            processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
     }
 }

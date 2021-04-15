@@ -289,7 +289,7 @@ public class UserActServiceTest {
     @Test
     public void testProcessAddNotExists(){
         when(usersRepository.findById("len")).thenReturn(Optional.empty());
-        Boolean result = userActService.processAdd2("www.facebook.com",3f, "2021-04-04","PC-LenHo");
+        Boolean result = userActService.processAdd("www.facebook.com",3f, "2021-04-04","PC-LenHo");
         assertFalse(result);
     }
     @Test
@@ -299,7 +299,7 @@ public class UserActServiceTest {
 
         when(userActDBRepository.findById(new MyKey("len","www.facebook.com","2021-04-04"))).thenReturn(Optional.of(userActivityDBA));
         when(usersRepository.findById("len")).thenReturn(Optional.of(users));
-        Boolean result = userActService.processAdd2("www.facebook.com",3f,"2021-04-04","len");
+        Boolean result = userActService.processAdd("www.facebook.com",3f,"2021-04-04","len");
         assertTrue(result);
     }
 }
