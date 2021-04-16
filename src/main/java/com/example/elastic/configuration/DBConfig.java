@@ -28,6 +28,7 @@ public class DBConfig {
         final ClientConfiguration clientConfiguration = ClientConfiguration.builder()
                 .connectedTo("199.30.30.98:9200")  // set the address of the Elasticsearch cluster
                 //.connectedTo("localhost:9200")
+                .withSocketTimeout(500000)
                 .build();
         return RestClients.create(clientConfiguration).rest();
     }

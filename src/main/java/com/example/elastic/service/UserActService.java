@@ -181,8 +181,6 @@ public class UserActService implements Job {
     public boolean processAdd(String message, float totalTime, String date, String pcName) {
         final long start = System.currentTimeMillis();
         Optional<UserActivityDB> userDB = findUserByIDDB(pcName, message, date);
-        final long end = System.currentTimeMillis();
-        findTime += (end - start);
         int count = 0;
         float total = 0;
         if (userDB.isPresent()) {
@@ -194,11 +192,12 @@ public class UserActService implements Job {
         UserActivityDB userActivityDB = new UserActivityDB(pcName, message, ++count, date, (totalTime / 60));
         if (checkExists(pcName)) {
             lstDbList.add(userActivityDB);
+            final long end = System.currentTimeMillis();
+            findTime += (end - start);
             return true;
         }
         return false;
     }
-
     public void addLstKeyTemp(String message, String date, String pcName, float totalTime) {
         MyKey myKey = new MyKey(pcName, message, date);
         mKey.put(myKey,totalTime);
@@ -394,7 +393,7 @@ public class UserActService implements Job {
 
     public CompositeAggregation groupByFieldUpdateComposite(String fromDate, String toDate) throws IOException {
         SearchSourceBuilder searchBuilder = new SearchSourceBuilder();
-        searchBuilder.timeout(new TimeValue(100, TimeUnit.SECONDS));
+        searchBuilder.timeout(new TimeValue(10, TimeUnit.DAYS));
         //searchBuilder.sort(new ScoreSortBuilder().order(SortOrder.ASC));
         searchBuilder.fetchSource(false);
 
@@ -426,16 +425,15 @@ public class UserActService implements Job {
         CompositeAggregation compositeAggregation = searchResponse.getAggregations().get("byProductAttributes");
         return compositeAggregation;
     }
-
     long y = 0;
-
     public Boolean mainProcessing(String timeStamp) throws ParseException, IOException {
         final long startTime = System.currentTimeMillis();
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
         fromDate = "2021-04-12" + "T01+0700";
-        toDate = "2021-04-13" + "T23+0700";
+        toDate = "2021-04-15" + "T23+0700";
         CompositeAggregation lstRoot = groupByFieldUpdateComposite(fromDate, toDate);
+//        Integer i = (Integer) lstRoot.afterKey().get("product2");
         for (CompositeAggregation.Bucket entry : lstRoot.getBuckets()) {
             Terms bucket = entry.getAggregations().get("url");
             String finalPcName = (String) entry.getKey().get("product");
@@ -473,7 +471,7 @@ public class UserActService implements Job {
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
         fromDate = "2021-04-12" + "T01+0700";
-        toDate = "2021-04-13" + "T23+0700";
+        toDate = "2021-04-16" + "T23+0700";
         Terms lstRoot = groupByFieldUpdateTerm(fromDate, toDate);
         for (Terms.Bucket entry : lstRoot.getBuckets()) {
             Terms bucket = entry.getAggregations().get("url");
@@ -516,7 +514,10 @@ public class UserActService implements Job {
             subProcess(lstDate, url, finalPcName);
         //xl
         //prepare list
-        //processAddCompare2(mKey);
+        final long start = System.currentTimeMillis();
+        processAddCompare2(mKey);
+        final long end = System.currentTimeMillis();
+        findTime += (end - start);
         //add to db
         final long start3 = System.currentTimeMillis();
         userActDBRepository.saveAll(lstDbList);
@@ -584,33 +585,66 @@ public class UserActService implements Job {
             if (timeUsed >= 180) {
                 if (totalTime == 0)
                     totalTime = 180;
+//                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                totalTime = 0;
+            } else
+                totalTime += timeUsed;
+            if (totalTime >= 600) {
+//                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                totalTime = 0;
+            }
+            if (i == lstUserRS.size() - 2) {
+                if (timeUsed >= 180)
+//                    processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+                    processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+
+                else
+//                    processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+                    processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
+
+            }
+        }
+        if (lstUserRS.size() == 1)
+//            processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+            processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
+
+    }
+    public void subProcessTemp(List<String> lstUserRS, String url, String finalPcName) {
+        AtomicReference<String> dateDB = new AtomicReference<>("");
+        dateDB.set(getDateFromEL(lstUserRS.get(0)));
+        float totalTime = 0;
+        for (int i = 0; i < lstUserRS.size() - 1; i++) {
+            String timeRootF = getTimeFromEL2(lstUserRS.get(i));
+            float secondTimeF = getSecondFromTime2(timeRootF);
+            String timeRootS = getTimeFromEL2(lstUserRS.get(i + 1));
+            float secondTimeS = getSecondFromTime2(timeRootS);
+            float timeUsed = secondTimeS - secondTimeF;
+            //time between two surf bigger than 3 minutes--->solve // break time =3m
+            if (timeUsed >= 180) {
+                if (totalTime == 0)
+                    totalTime = 180;
                 processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
-//                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             } else
                 totalTime += timeUsed;
             if (totalTime >= 600) {
                 processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
-//                processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             }
             if (i == lstUserRS.size() - 2) {
                 if (timeUsed >= 180)
                     processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
-//                    processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
 
                 else
                     processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
-//                    processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
-
             }
         }
         if (lstUserRS.size() == 1)
             processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
-//            processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
 
     }
-
     public float getSecondFromTime2(String time) {
         float total;
         String[] arr = time.split(":");
