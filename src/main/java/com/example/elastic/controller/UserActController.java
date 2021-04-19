@@ -9,6 +9,7 @@ import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.repository.UsersRepository;
 import com.example.elastic.service.UserActService;
+import com.example.elastic.service.UserActService2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,8 @@ public class UserActController {
     public UsersRepository usersRepository;
     @Autowired
     private UserActService userActService;
+    @Autowired
+    private UserActService2 userActService2;
     @Autowired
     private UserActRepository userActRepository;
     @Autowired
@@ -119,5 +122,9 @@ public class UserActController {
         LOGGER.info("----------sequence");
         LOGGER.info("size is: "+result.size());
         LOGGER.info("time is: "+(end-start));
+    }
+    @GetMapping("/test6")
+    public void test6() throws IOException, ParseException {
+        userActService2.mainProcessing("");
     }
 }

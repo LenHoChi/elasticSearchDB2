@@ -21,16 +21,16 @@ import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
 @SpringBootApplication
 @ComponentScan({"com.example","com.easyquartz"})
 public class ElasticApplication {
-	private static ScheduleService scheduleService;
-	@Autowired
-	public ElasticApplication(ScheduleService scheduleService){
-		ElasticApplication.scheduleService = scheduleService;
-	}
-	public static void startCron(){
-		scheduleService.schedule(UserActService.class, "lenho15","0 22 11,16 ? * *");
-				//"","0 50 11,13 ? * *");
-			//	"","0/15 * * * * ? *");
-	}
+//	private static ScheduleService scheduleService;
+//	@Autowired
+//	public ElasticApplication(ScheduleService scheduleService){
+//		ElasticApplication.scheduleService = scheduleService;
+//	}
+//	public static void startCron(){
+//		scheduleService.schedule(UserActService.class, "lenho15","0 22 11,16 ? * *");
+//				//"","0 50 11,13 ? * *");
+//			//	"","0/15 * * * * ? *");
+//	}
 	public static void main(String[] args) {
 		SpringApplication.run(ElasticApplication.class, args);
 //		startCron();

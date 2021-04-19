@@ -255,7 +255,7 @@ public class UserActService implements Job {
     Map<MyKey, Float> mKey = new HashMap<>();
     List<UserActivityDB> lstDbList = new ArrayList<>();
     long findTime = 0;
-    long z = 0;
+    long all_save_time = 0;
     long saveTime = 0;
 
     public Optional<UserActivityDB> findUserByIDDB(String pcName, String url, String date) {
@@ -431,14 +431,13 @@ public class UserActService implements Job {
         System.out.println(timeStamp);
         String fromDate = "", toDate = "";
         fromDate = "2021-04-12" + "T01+0700";
-        toDate = "2021-04-15" + "T23+0700";
+        toDate = "2021-04-14" + "T23+0700";
         CompositeAggregation lstRoot = groupByFieldUpdateComposite(fromDate, toDate);
 //        Integer i = (Integer) lstRoot.afterKey().get("product2");
         for (CompositeAggregation.Bucket entry : lstRoot.getBuckets()) {
             Terms bucket = entry.getAggregations().get("url");
             String finalPcName = (String) entry.getKey().get("product");
             bucket.getBuckets().forEach(ele -> {
-
                 List<String> lstDate = new ArrayList<>();
                 String url = ele.getKeyAsString();
                 Terms bucket1 = ele.getAggregations().get("date1");
@@ -451,7 +450,7 @@ public class UserActService implements Job {
                 final long startTime2 = System.currentTimeMillis();
                 executeProcess(lstDate, url, finalPcName);
                 final long endTime2 = System.currentTimeMillis();
-                z += (endTime2 - startTime2);
+                all_save_time += (endTime2 - startTime2);
                 //subProcess(lstDate,url,finalPcName);
             });
         }
@@ -459,8 +458,8 @@ public class UserActService implements Job {
         LOGGER.log(Logger.Level.INFO, "Total execution time: " + (endTime - startTime));
         LOGGER.log(Logger.Level.INFO, "find time :" + findTime);
         findTime = 0;
-        LOGGER.log(Logger.Level.INFO, "save time all :" + z);
-        z = 0;
+        LOGGER.log(Logger.Level.INFO, "save time all :" + all_save_time);
+        all_save_time = 0;
         LOGGER.log(Logger.Level.INFO, "save time :" + saveTime);
         saveTime = 0;
         return true;
@@ -486,7 +485,9 @@ public class UserActService implements Job {
                 if (!checkContain(url)) {
                     return;
                 }
+                //danh cho nhieu ngay
                 executeProcess(lstDate, url, finalPcName);
+                //danh cho 1 ngay duy nhat
                 //subProcess(lstDate,url,finalPcName);
             });
         }
@@ -585,31 +586,23 @@ public class UserActService implements Job {
             if (timeUsed >= 180) {
                 if (totalTime == 0)
                     totalTime = 180;
-//                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             } else
                 totalTime += timeUsed;
             if (totalTime >= 600) {
-//                processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                 totalTime = 0;
             }
             if (i == lstUserRS.size() - 2) {
                 if (timeUsed >= 180)
-//                    processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
                     processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
-
                 else
-//                    processAdd(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
                     processAddCompare(splitHeadTail(url), totalTime, dateDB.get(), finalPcName);
-
             }
         }
         if (lstUserRS.size() == 1)
-//            processAdd(splitHeadTail(url), 180, dateDB.get(), finalPcName);
             processAddCompare(splitHeadTail(url), 180, dateDB.get(), finalPcName);
-
     }
     public void subProcessTemp(List<String> lstUserRS, String url, String finalPcName) {
         AtomicReference<String> dateDB = new AtomicReference<>("");
