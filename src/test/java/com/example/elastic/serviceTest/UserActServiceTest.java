@@ -142,50 +142,6 @@ public class UserActServiceTest {
         assertEquals(result,urlResult);
     }
     @Test
-    public void testCount(){
-        String url = "CONNECT www.youtube.com:443 HTTP/1.1";
-        String pcName = "PC-LenHo";
-        String date = "2021-12-21T06:23:34Z";
-        Optional<UserActivityDB> user = Optional.of(new UserActivityDB(pcName,url,2,date,12));
-
-        when(userActDBRepository.findById(new MyKey(pcName,url,date))).thenReturn(user);
-        int count = userActService.getCount(pcName,url,date);
-        assertEquals(count,user.get().getCount());
-    }
-    @Test
-    public void testCountFail(){
-        String url = "CONNECT www.youtube.com:443 HTTP/1.1";
-        String pcName = "PC-LenHo";
-        String date = "2021-12-21T06:23:34Z";
-        Optional<UserActivityDB> user = Optional.of(new UserActivityDB(pcName,url,2,date,12));
-
-        when(userActDBRepository.findById(new MyKey(pcName,"url",date))).thenReturn(user);
-        int count = userActService.getCount(pcName,url,date);
-        assertEquals(count,0);
-    }
-    @Test
-    public void testTotalTime(){
-        String url = "CONNECT www.youtube.com:443 HTTP/1.1";
-        String pcName = "PC-LenHo";
-        String date = "2021-12-21T06:23:34Z";
-        Optional<UserActivityDB> user = Optional.of(new UserActivityDB(pcName,url,2,date,12));
-
-        when(userActDBRepository.findById(new MyKey(pcName,url,date))).thenReturn(user);
-        float totalTime = userActService.getTotalTime(pcName,url,date);
-        assertEquals(totalTime,user.get().getTotal_time());
-    }
-    @Test
-    public void testTotalTimeFail(){
-        String url = "CONNECT www.youtube.com:443 HTTP/1.1";
-        String pcName = "PC-LenHo";
-        String date = "2021-12-21T06:23:34Z";
-        Optional<UserActivityDB> user = Optional.of(new UserActivityDB(pcName,url,2,date,12));
-
-        when(userActDBRepository.findById(new MyKey(pcName,url,date))).thenReturn(user);
-        float totalTime = userActService.getTotalTime(pcName,"url",date);
-        assertEquals(totalTime,0);
-    }
-    @Test
     public void findByField(){
         String url = "www.facebook.com";
         String pcName = "PC-LenHo0";

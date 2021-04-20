@@ -32,99 +32,30 @@ public class UserActController {
     private UserActRepository userActRepository;
     @Autowired
     private UserActDBRepository userActDBRepository;
-    @GetMapping("/find-all")
-    public Iterable<UserActivity> findAllUsers() {
-        return userActService.findAll();
-    }
-    @GetMapping("/find-all-db")
-    public List<UserActivityDB> findAllUsersDB() {
-        return userActDBRepository.findAll();
-    }
-    @GetMapping("/find-by-url")
-    public List<UserActivity> findByUrl(@RequestBody String url) {
-        return userActService.findByUrl(url);
-    }
-    @GetMapping("find-by-field")
-    public List<UserActivity> solve2(@RequestBody String message) throws IOException {
-        return userActService.findByField(userActService.splitHeadTail(message),"2021-03-30","2021-03-31","PC-QUANPHAM$");
-    }
-    @PostMapping("/saveAll")
-    public boolean saveAll() {
-        return userActService.saveAll();
-    }
+    //----------------------------BEGIN---------------------------------------------------\
+    //pb 1: group  {user_id, url}+query {date}--> find(use croll)
     @PostMapping("/pull-into-db")
-    public boolean pullDataIntoDB2(@RequestBody String time) throws IOException, ParseException {
-        return userActService.mainProcessing2(time);
-    }
-    @PostMapping("/pull-into-db2")
     public boolean pullDataIntoDB(@RequestBody String time) throws IOException, ParseException {
-        return userActService.mainProcessing2(time);
+        return userActService.mainProcess(time);
     }
-    @PostMapping("/pull-into-db4")
-    public boolean pullDataIntoDB4(@RequestBody String time) throws IOException, ParseException {
+    //pb 2: source {user_id} agg url & localdate
+    @PostMapping("/pull-into-db2")
+    public boolean pullDataIntoDB2(@RequestBody String time) throws IOException, ParseException {
         return userActService.mainProcessing(time);
     }
-    @PostMapping("/pull-into-db5")
-    public boolean pullDataIntoDB5(@RequestBody String time) throws IOException, ParseException {
+    //pb3 groupby {3 field}
+    @PostMapping("/pull-into-db3")
+    public boolean pullDataIntoDB3(@RequestBody String time) throws IOException, ParseException {
         return userActService.mainProcessingTerm(time);
     }
-    @GetMapping("/test")
-    public void test(){
-        userActService.saveST();
+    //pb4 soruce {2 field} agg 1 field
+    @GetMapping("/pull-into-db4")
+    public void pullDataIntoDB4() throws IOException, ParseException {
+        userActService.mainProcessing3("");
     }
-    @GetMapping("/test2")
-    public List<UserActivity> test2() throws IOException {
-        return userActService.findByFieldCroll("www.facebook.com","2021-04-12","2021-04-12","PC-LenHo$");
-    }
-    @GetMapping("/test3")
-    public void test3(){
-        final long start = System.currentTimeMillis();
-        List<Users> lstUsers = new ArrayList<>();
-        for(int i=0;i<10000;i++){
-            Users users = new Users("name"+i,"email");
-            lstUsers.add(users);
-        }
-        usersRepository.saveAll(lstUsers);
-        //---------------
-//		for(int i=0;i<10000;i++){
-//			Users users = new Users("name"+i,"email");
-//			usersRepository.save(users);
-//		}
-        final long end = System.currentTimeMillis();
-        System.out.println(end-start);
-    }
-    @GetMapping("/test4")
-    public void test4(){
-        List<String> lstKey = new ArrayList<>();
-        List<Users> result = new ArrayList<>();
-        for(int i =0; i<10000;i++){
-            lstKey.add("name"+i);
-        }
-        final long start = System.currentTimeMillis();
-        result = usersRepository.findAllById(lstKey);
-        final long end = System.currentTimeMillis();
-        LOGGER.info("----------all");
-        LOGGER.info("size is: "+result.size());
-        LOGGER.info("time is: "+(end-start));
-    }
-    @GetMapping("/test5")
-    public void test5(){
-        List<String> lstKey = new ArrayList<>();
-        List<Users> result = new ArrayList<>();
-        for(int i =0; i<10000;i++){
-            lstKey.add("name"+i);
-        }
-        final long start = System.currentTimeMillis();
-        for(int i=0;i<10000;i++){
-            result.add(usersRepository.findById(lstKey.get(i)).get());
-        }
-        final long end = System.currentTimeMillis();
-        LOGGER.info("----------sequence");
-        LOGGER.info("size is: "+result.size());
-        LOGGER.info("time is: "+(end-start));
-    }
-    @GetMapping("/test6")
-    public void test6() throws IOException, ParseException {
-        userActService2.mainProcessing("");
+    //pb5 nt but add for
+    @GetMapping("/pull-into-db5")
+    public void pullDataIntoDB5() throws IOException {
+        userActService2.main2();
     }
 }
