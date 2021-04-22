@@ -1,23 +1,15 @@
 package com.example.elastic.controller;
 
-import com.easyquartz.scheduler.ScheduleService;
-import com.example.elastic.ElasticApplication;
-import com.example.elastic.model.UserActivity;
-import com.example.elastic.model.UserActivityDB;
-import com.example.elastic.model.Users;
 import com.example.elastic.repository.UserActDBRepository;
 import com.example.elastic.repository.UserActRepository;
 import com.example.elastic.repository.UsersRepository;
 import com.example.elastic.service.UserActService;
-import com.example.elastic.service.UserActService2;
+import com.example.elastic.service.UserActiveService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.*;
-
-import static org.hibernate.tool.schema.SchemaToolingLogging.LOGGER;
 
 @RestController
 public class UserActController {
@@ -27,7 +19,7 @@ public class UserActController {
     @Autowired
     private UserActService userActService;
     @Autowired
-    private UserActService2 userActService2;
+    private UserActiveService userActService2;
     @Autowired
     private UserActRepository userActRepository;
     @Autowired
@@ -55,7 +47,7 @@ public class UserActController {
     }
     //pb5 nt but add for
     @GetMapping("/pull-into-db5")
-    public void pullDataIntoDB5() throws IOException {
-        userActService2.main2();
+    public void pullDataIntoDB5() throws IOException, ParseException {
+        userActService2.mainCore("");
     }
 }

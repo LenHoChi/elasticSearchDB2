@@ -93,26 +93,7 @@ public class UserActServiceTest {
 //
 //        assertEquals(lstUser.size(),lstUserTest.size());
     }
-    @Test
-    public void testFindByUrl(){
-        UserActivity userActivityA = new UserActivity("1","www.youtube.com","2021-04-23","PC-LenHo");
-        UserActivity userActivityB = new UserActivity("2","www.facebook.com","2021-05-23","PC-LenHo");
 
-        List<UserActivity> lstUser = Arrays.asList(userActivityA, userActivityB);
-        String message = "www.vnexpress.net";
-        when(userActRepository.findByUrl(message)).thenReturn(lstUser);
-        List<UserActivity> lstUserTest = userActService.findByUrl(message);
-        assertEquals(lstUser.size(),lstUserTest.size());
-    }
-    @Test
-    public void testSaveAll(){
-        UserActivityDB userActivityDB = new UserActivityDB("PC-LenHo","www.youtube.com",2,"2021-02-12",12);
-        List<UserActivityDB> lstUser = Arrays.asList(userActivityDB);
-
-        when(userActDBRepository.saveAll(lstUser)).thenReturn(lstUser);
-        Boolean result = userActService.saveAll();
-        assertTrue(result);
-    }
     @Test
     public void testGetDateFromEL(){
         String time = "2021-12-21T06:23:34";
